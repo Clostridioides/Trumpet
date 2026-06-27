@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Trompeten-Notenquiz</title>
+<style>
+
+
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Georgia,serif;background:linear-gradient(145deg,#0d0d1a,#1a1a2e,#16213e);color:#e8e8e8;min-height:100vh;display:flex;flex-direction:column;align-items:center;overflow-x:hidden}
+.container{width:100%;max-width:440px;padding:16px;display:flex;flex-direction:column;align-items:center}
+h1{font-size:1.6em;color:#f0c040;text-align:center;margin:18px 0 6px}
+h2{font-size:1.08em;color:#f0c040;margin:12px 0 8px}
+.subtitle{color:#aaa;font-size:0.85em;margin-bottom:18px;text-align:center}
+.menu-section,.panel{width:100%;background:rgba(255,255,255,0.05);border-radius:12px;padding:14px;margin-bottom:14px}
+.menu-section h2,.panel h2{margin-top:0}
+.opt-grid{display:flex;flex-direction:column;gap:8px}
+.inline-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.opt-btn{background:rgba(240,192,64,0.1);border:2px solid rgba(240,192,64,0.25);color:#e8e8e8;padding:12px;border-radius:10px;font-family:Georgia,serif;font-size:0.95em;cursor:pointer;transition:all 0.2s;text-align:left}
+.opt-btn:hover{border-color:#f0c040;background:rgba(240,192,64,0.15)}
+.opt-btn.selected{border-color:#f0c040;background:rgba(240,192,64,0.22);color:#f0c040;box-shadow:0 0 12px rgba(240,192,64,0.15)}
+.opt-label{font-weight:bold}
+.opt-desc{font-size:0.8em;color:#aaa;margin-top:2px}
+.start-btn{width:100%;padding:14px;background:linear-gradient(135deg,#f0c040,#e0a020);color:#1a1a2e;font-family:Georgia,serif;font-size:1.1em;font-weight:bold;border:none;border-radius:12px;cursor:pointer;margin-top:10px;transition:transform 0.15s,box-shadow 0.15s}
+.start-btn:hover{transform:scale(1.02);box-shadow:0 4px 20px rgba(240,192,64,0.3)}
+.start-btn:disabled{opacity:0.4;cursor:default;transform:none;box-shadow:none}
+.score-bar{width:100%;display:flex;justify-content:space-between;align-items:center;padding:8px 4px;font-size:0.85em;color:#ccc;margin-bottom:4px}
+.score-streak{color:#f0c040;font-weight:bold}.score-pct{color:#aaa}
+svg.staff{width:100%;height:auto;margin:8px 0}
+.note-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;margin:10px 0}
+.note-btn{padding:12px 4px;background:rgba(255,255,255,0.08);border:2px solid rgba(255,255,255,0.15);border-radius:10px;color:#e8e8e8;font-family:Georgia,serif;font-size:1.05em;font-weight:bold;cursor:pointer;transition:all 0.2s}
+.note-btn:hover{border-color:#f0c040;background:rgba(240,192,64,0.12)}
+.note-btn.correct{background:rgba(34,197,94,0.25);border-color:#22c55e;color:#22c55e}
+.note-btn.wrong{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:rgba(239,68,68,0.75)}
+.note-btn.dimmed{opacity:0.35;pointer-events:none}.note-btn:disabled{cursor:default}
+.ref-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(240,192,64,0.12);border:1.5px solid rgba(240,192,64,0.3);border-radius:8px;color:#f0c040;font-family:Georgia,serif;font-size:0.9em;cursor:pointer;transition:all 0.15s;margin:4px 0}
+.ref-btn:hover{background:rgba(240,192,64,0.2)}
+.mic-area{width:100%;text-align:center;margin:10px 0}
+.mic-btn{padding:12px 20px;background:rgba(99,102,241,0.15);border:2px solid rgba(99,102,241,0.35);border-radius:12px;color:#a5b4fc;font-family:Georgia,serif;font-size:0.95em;cursor:pointer;transition:all 0.2s}
+.mic-btn:hover{border-color:#6366f1;background:rgba(99,102,241,0.25)}
+.mic-btn.recording{border-color:#ef4444;background:rgba(239,68,68,0.12);color:#fca5a5;animation:pulse-rec 1.2s infinite}
+.mic-btn.connected{border-color:#22c55e;background:rgba(34,197,94,0.12);color:#86efac}
+@keyframes pulse-rec{0%,100%{box-shadow:0 0 4px rgba(239,68,68,0.3)}50%{box-shadow:0 0 18px rgba(239,68,68,0.6)}}
+.mic-status{margin-top:8px;font-size:0.85em;color:#a5b4fc}.mic-detected{font-size:1.25em;font-weight:bold;color:#c4b5fd;margin-top:6px}.mic-freq{font-size:0.75em;color:#888;margin-top:2px}
+.rec-dot{display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:50%;margin-right:6px;animation:pulse-rec 1.2s infinite}
+.combo-status{width:100%;text-align:center;font-size:0.95em;margin:8px 0;color:#ccc}
+.feedback{width:100%;text-align:center;padding:14px;border-radius:10px;margin:10px 0;font-size:1em;font-weight:bold}
+.feedback.correct{background:rgba(34,197,94,0.15);color:#22c55e;border:1.5px solid rgba(34,197,94,0.3)}
+.feedback.wrong{background:rgba(239,68,68,0.15);color:#ef4444;border:1.5px solid rgba(239,68,68,0.3)}
+.nav-row{display:flex;gap:10px;width:100%;margin-top:10px}
+.nav-btn{flex:1;padding:12px;border-radius:10px;font-family:Georgia,serif;font-size:0.95em;cursor:pointer;border:none;transition:all 0.15s}
+.nav-btn.next{background:linear-gradient(135deg,#f0c040,#e0a020);color:#1a1a2e;font-weight:bold}.nav-btn.next:hover{transform:scale(1.02)}
+.nav-btn.back{background:rgba(255,255,255,0.08);border:1.5px solid rgba(255,255,255,0.15);color:#ccc}.nav-btn.back:hover{border-color:#f0c040;color:#f0c040}
+.meta{font-size:0.78em;color:#aaa;line-height:1.45;margin-top:8px}.small{font-size:0.78em;color:#aaa}
+.tuner-wrap{margin-top:10px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.04)}
+.tuner-note{font-size:1.9em;font-weight:bold;color:#f0c040;text-align:center}
+.tuner-sub{font-size:0.82em;color:#bbb;text-align:center;margin-top:2px}
+.tuner-meter{position:relative;width:100%;height:54px;margin-top:10px}
+.tuner-scale{position:absolute;left:0;right:0;top:24px;height:2px;background:rgba(255,255,255,0.2)}
+.tuner-center{position:absolute;left:50%;top:14px;width:2px;height:22px;background:#f0c040;transform:translateX(-50%)}
+.tuner-tick{position:absolute;top:18px;width:1px;height:12px;background:rgba(255,255,255,0.18)}
+.tuner-needle{position:absolute;top:8px;width:3px;height:32px;background:#a5b4fc;border-radius:2px;left:50%;transform:translateX(-50%)}
+.warning{width:100%;font-size:0.8em;color:#fca5a5;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);padding:10px;border-radius:10px;margin-top:10px;line-height:1.4}
+.opt-btn,.note-btn,.ref-btn,.nav-btn,.start-btn{-webkit-tap-highlight-color:transparent;user-select:none}
+.opt-btn:active,.note-btn:active,.ref-btn:active,.nav-btn:active,.start-btn:active{transform:scale(0.97)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.container>*{animation:fadeIn 0.18s ease}
+.feedback{animation:fadeIn 0.22s ease}
+
+
+
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<script>
+
+var S = {
+  screen: 'menu',
+  lang: 'de',
+  quizType: 'single', // single | jazz
+  difficulty: 'easy',
+  mode: 'click', // for single only
+  transposition: 'Bb',
+  concertA: 442,
+  tuningTargetWrittenMidi: 67,
+  toleranceMode: 'normal',
+  autoAdvance: true,
+
+  round: 0,
+  correctCount: 0,
+  totalCount: 0,
+  streak: 0,
+
+  currentNote: null,
+
+  answered: false,
+  clickAnswer: null,
+  micAnswer: null,
+  clickCorrect: null,
+  micCorrect: null,
+
+  micListening: false,
+  micConnected: false,
+  micDetectedName: '',
+  micDetectedWritten: '',
+  micDetectedFreq: 0,
+  micDetectedCents: 0,
+  stableCount: 0,
+  lastMidi: -1,
+  micLocked: false,
+  showFingering: false,
+  permissionHint: '',
+
+  setupTuningPhase: false,
+  setupTuned: false,
+  tuningStableCount: 0,
+
+  micResumeAfterReference: false,
+  refPlaybackUntil: 0,
+
+  autoAdvanceTimer: null,
+  showSettings: false,
+
+  // ---- Jazz path ----
+  jazzTrack: 'blues',
+  jazzLessonId: null,
+  jazzPhrase: [],
+  jazzStep: 0,
+  jazzDoneStep: 0,
+  jazzMode: 'listen',   // listen | play
+  jazzTempo: 70,
+  jazzSwing: false,
+  jazzPlaying: false,
+  jazzShowNames: true,
+  jazzMatchCount: 0,
+  jazzWaitRelease: false,
+  jazzReleaseCount: 0,
+  jazzCompleted: false,
+  jazzProgress: {}
+};
+
+// ---- Settings persistence ----
+var PERSIST_KEYS = ['lang','difficulty','mode','transposition','concertA','tuningTargetWrittenMidi','toleranceMode','autoAdvance','jazzProgress'];
+function saveSettings() {
+  try {
+    var o = {};
+    PERSIST_KEYS.forEach(function(k){ o[k] = S[k]; });
+    localStorage.setItem('trumpetQuiz', JSON.stringify(o));
+  } catch(e) {}
+}
+function loadSettings() {
+  try {
+    var raw = localStorage.getItem('trumpetQuiz');
+    if (!raw) return;
+    var o = JSON.parse(raw);
+    PERSIST_KEYS.forEach(function(k){ if (o[k] !== undefined) S[k] = o[k]; });
+  } catch(e) {}
+}
+
+var TRANS = {
+  'Bb': {label_de:'B-Trompete', label_en:'B♭ trumpet', semitones:-2, desc_de:'klingt einen Ganzton tiefer', desc_en:'sounds a whole step lower'},
+  'C':  {label_de:'C-Trompete', label_en:'C trumpet', semitones:0, desc_de:'klingt wie notiert', desc_en:'sounds as written'},
+  'Eb': {label_de:'Es-Trompete', label_en:'E♭ trumpet', semitones:3, desc_de:'klingt eine kleine Terz höher', desc_en:'sounds a minor third higher'}
+};
+
+var DIFF = {
+  veryeasy:{label_de:'1 · Sehr leicht', label_en:'1 · Very easy', desc_de:"C' – G' (5 Stammtöne)", desc_en:"C' – G' (5 natural notes)", min:60, max:67, chromatic:false},
+  easy:    {label_de:'2 · Leicht', label_en:'2 · Easy', desc_de:"C' – C'' (8 Stammtöne)", desc_en:"C' – C'' (8 natural notes)", min:60, max:72, chromatic:false},
+  medium:  {label_de:'3 · Mittel', label_en:'3 · Medium', desc_de:"C' – G'' (12 Stammtöne)", desc_en:"C' – G'' (12 natural notes)", min:60, max:79, chromatic:false},
+  hard:    {label_de:'4 · Schwer', label_en:'4 · Hard', desc_de:"C' – C''' (15 Stammtöne)", desc_en:"C' – C''' (15 natural notes)", min:60, max:84, chromatic:false},
+  expert:  {label_de:'5 · Profi', label_en:'5 · Expert', desc_de:"chromatisch C' – C'''", desc_en:"chromatic C' – C'''", min:60, max:84, chromatic:true}
+};
+
+var MODES = {
+  click: {label_de:'Notennamen klicken', label_en:'Click note names', desc_de:'Erkenne die Note und klicke den Namen', desc_en:'Recognize the note and click its name'},
+  mic:   {label_de:'Ton spielen (Mikrofon)', label_en:'Play the note (microphone)', desc_de:'Spiele die notierte Note auf deiner Trompete', desc_en:'Play the written note on your trumpet'},
+  both:  {label_de:'Beides', label_en:'Both', desc_de:'Name klicken und Ton spielen', desc_en:'Click the name and play the note'}
+};
+
+var TOLERANCE = {
+  strict: {tuningStable:18, answerStable:14, tuningCents:12, answerCents:30},
+  normal: {tuningStable:16, answerStable:12, tuningCents:18, answerCents:45},
+  relaxed:{tuningStable:12, answerStable:9,  tuningCents:24, answerCents:60}
+};
+
+var ROOTS = [
+  {id:'C',  letter:0, accidental:0,  baseMidi:60, label_de:'C',  label_en:'C'},
+  {id:'G',  letter:4, accidental:0,  baseMidi:67, label_de:'G',  label_en:'G'},
+  {id:'D',  letter:1, accidental:0,  baseMidi:62, label_de:'D',  label_en:'D'},
+  {id:'A',  letter:5, accidental:0,  baseMidi:69, label_de:'A',  label_en:'A'},
+  {id:'E',  letter:2, accidental:0,  baseMidi:64, label_de:'E',  label_en:'E'},
+  {id:'H',  letter:6, accidental:0,  baseMidi:71, label_de:'H',  label_en:'B'},
+  {id:'F',  letter:3, accidental:0,  baseMidi:65, label_de:'F',  label_en:'F'},
+  {id:'B',  letter:6, accidental:-1, baseMidi:70, label_de:'B',  label_en:'Bb'},
+  {id:'Es', letter:2, accidental:-1, baseMidi:63, label_de:'Es', label_en:'Eb'},
+  {id:'As', letter:5, accidental:-1, baseMidi:68, label_de:'As', label_en:'Ab'}
+];
+
+var SCALE_TYPES = {
+  major:      {name_de:'Dur', name_en:'Major', intervals:[0,2,4,5,7,9,11,12], letterSteps:[0,1,2,3,4,5,6,7]},
+  naturalMin: {name_de:'Natürlich Moll', name_en:'Natural minor', intervals:[0,2,3,5,7,8,10,12], letterSteps:[0,1,2,3,4,5,6,7]},
+  majorPent:  {name_de:'Dur-Pentatonik', name_en:'Major pentatonic', intervals:[0,2,4,7,9,12], letterSteps:[0,1,2,4,5,7]},
+  minorPent:  {name_de:'Moll-Pentatonik', name_en:'Minor pentatonic', intervals:[0,3,5,7,10,12], letterSteps:[0,2,3,4,6,7]},
+  blues:      {name_de:'Blues-Skala', name_en:'Blues scale', intervals:[0,3,5,6,7,10,12], letterSteps:[0,2,3,3,4,6,7]}
+};
+
+var NATURAL_SEMITONES = [0,2,4,5,7,9,11];
+var LETTERS_DE = ['C','D','E','F','G','A','H'];
+var LETTERS_EN = ['C','D','E','F','G','A','B'];
+
+var BASE_NOTES = [
+  {name:'C',   midi:60, display:"c'",    staffPos:-2, acc:'',      chromatic:false, fing:[]},
+  {name:'Cis', midi:61, display:"cis'",  staffPos:-2, acc:'sharp', chromatic:true,  fing:[1,2,3]},
+  {name:'D',   midi:62, display:"d'",    staffPos:-1, acc:'',      chromatic:false, fing:[1,3]},
+  {name:'Es',  midi:63, display:"es'",   staffPos:0,  acc:'flat',  chromatic:true,  fing:[2,3]},
+  {name:'E',   midi:64, display:"e'",    staffPos:0,  acc:'',      chromatic:false, fing:[1,2]},
+  {name:'F',   midi:65, display:"f'",    staffPos:1,  acc:'',      chromatic:false, fing:[1]},
+  {name:'Fis', midi:66, display:"fis'",  staffPos:1,  acc:'sharp', chromatic:true,  fing:[2]},
+  {name:'G',   midi:67, display:"g'",    staffPos:2,  acc:'',      chromatic:false, fing:[]},
+  {name:'As',  midi:68, display:"as'",   staffPos:3,  acc:'flat',  chromatic:true,  fing:[2,3]},
+  {name:'A',   midi:69, display:"a'",    staffPos:3,  acc:'',      chromatic:false, fing:[1,2]},
+  {name:'B',   midi:70, display:"b'",    staffPos:4,  acc:'flat',  chromatic:true,  fing:[1]},
+  {name:'H',   midi:71, display:"h'",    staffPos:4,  acc:'',      chromatic:false, fing:[2]},
+  {name:'C',   midi:72, display:"c''",   staffPos:5,  acc:'',      chromatic:false, fing:[]},
+  {name:'Cis', midi:73, display:"cis''", staffPos:5,  acc:'sharp', chromatic:true,  fing:[1,2,3]},
+  {name:'D',   midi:74, display:"d''",   staffPos:6,  acc:'',      chromatic:false, fing:[1,3]},
+  {name:'Es',  midi:75, display:"es''",  staffPos:7,  acc:'flat',  chromatic:true,  fing:[2,3]},
+  {name:'E',   midi:76, display:"e''",   staffPos:7,  acc:'',      chromatic:false, fing:[1,2]},
+  {name:'F',   midi:77, display:"f''",   staffPos:8,  acc:'',      chromatic:false, fing:[1]},
+  {name:'Fis', midi:78, display:"fis''", staffPos:8,  acc:'sharp', chromatic:true,  fing:[2]},
+  {name:'G',   midi:79, display:"g''",   staffPos:9,  acc:'',      chromatic:false, fing:[]},
+  {name:'As',  midi:80, display:"as''",  staffPos:10, acc:'flat',  chromatic:true,  fing:[2,3]},
+  {name:'A',   midi:81, display:"a''",   staffPos:10, acc:'',      chromatic:false, fing:[1,2]},
+  {name:'B',   midi:82, display:"b''",   staffPos:11, acc:'flat',  chromatic:true,  fing:[1]},
+  {name:'H',   midi:83, display:"h''",   staffPos:11, acc:'',      chromatic:false, fing:[2]},
+  {name:'C',   midi:84, display:"c'''",  staffPos:12, acc:'',      chromatic:false, fing:[]}
+];
+
+// =========================================================================
+//  JAZZ / BLUES / BEBOP CURRICULUM
+//  All phrases are generic, public-domain practice patterns (blues scale,
+//  enclosures, ii-V-I, bebop dominant scale) written in trumpet-friendly
+//  keys — not transcriptions of any specific recording.
+//  Notes are WRITTEN pitches (MIDI), so they map onto the existing
+//  fingering/notation system. Concert C blues / bebop in C area.
+// =========================================================================
+var JAZZ_TRACKS = {
+  blues: {
+    name_de: 'Blues', name_en: 'Blues',
+    desc_de: 'Von der Blues-Tonleiter bis zum 12-Takt-Riff.',
+    desc_en: 'From the blues scale to a 12-bar riff.',
+    lessons: [
+      { id:'bl1', level:1, tempo:60, swing:false,
+        name_de:'Blues-Tonleiter aufwärts', name_en:'Blues scale up',
+        desc_de:'Die sechs Töne der Blues-Tonleiter, langsam und einzeln – mit Griff.',
+        desc_en:'The six notes of the blues scale, slow and one by one – with fingering.',
+        notes:[60,63,65,66,67,70,72] },
+      { id:'bl2', level:1, tempo:64, swing:false,
+        name_de:'Blues-Tonleiter abwärts', name_en:'Blues scale down',
+        desc_de:'Dieselben Töne wieder hinunter.',
+        desc_en:'The same notes coming back down.',
+        notes:[72,70,67,66,65,63,60] },
+      { id:'bl3', level:2, tempo:76, swing:true,
+        name_de:'Die Blue Note', name_en:'The blue note',
+        desc_de:'Die typische „blaue" Note (♭5) auflösen – das Herz des Blues.',
+        desc_en:'Resolving the characteristic “blue” note (♭5) – the heart of the blues.',
+        notes:[65,66,67,66,65,63] },
+      { id:'bl4', level:2, tempo:88, swing:true,
+        name_de:'Blues-Lauf', name_en:'Blues run',
+        desc_de:'Ein aufsteigender Blues-Lauf über die ganze Skala.',
+        desc_en:'An ascending blues run across the whole scale.',
+        notes:[60,63,65,66,67,70,72,70,67] },
+      { id:'bl5', level:3, tempo:100, swing:true,
+        name_de:'Call (Frage)', name_en:'Call (question)',
+        desc_de:'Eine kurze Blues-Phrase als „Frage" – typisches Call-&-Response.',
+        desc_en:'A short blues phrase as a “question” – classic call & response.',
+        notes:[67,70,72,70,67,63,60] },
+      { id:'bl6', level:3, tempo:112, swing:true,
+        name_de:'12-Takt-Riff', name_en:'12-bar riff',
+        desc_de:'Ein längeres Riff, das alles Gelernte verbindet.',
+        desc_en:'A longer riff tying everything together.',
+        notes:[60,63,65,66,67,67,66,65,63,60,63,60] }
+    ]
+  },
+  bebop: {
+    name_de:'Bebop', name_en:'Bebop',
+    desc_de:'Vom Arpeggio über die Bebop-Skala bis zur ii–V–I-Linie.',
+    desc_en:'From arpeggios through the bebop scale to a ii–V–I line.',
+    lessons: [
+      { id:'bb1', level:1, tempo:60, swing:false,
+        name_de:'Dur-Arpeggio 1-3-5', name_en:'Major arpeggio 1-3-5',
+        desc_de:'Der Dreiklang als Bausteine jeder Jazz-Linie – langsam mit Griff.',
+        desc_en:'The triad, the building block of every jazz line – slow with fingering.',
+        notes:[60,64,67,72] },
+      { id:'bb2', level:1, tempo:72, swing:false,
+        name_de:'1-2-3-5 Pattern', name_en:'1-2-3-5 pattern',
+        desc_de:'Ein Grundpattern der Jazz-Etüden.',
+        desc_en:'A fundamental jazz étude pattern.',
+        notes:[60,62,64,67] },
+      { id:'bb3', level:2, tempo:84, swing:true,
+        name_de:'Bebop-Dominant-Tonleiter', name_en:'Bebop dominant scale',
+        desc_de:'Dur-Tonleiter mit chromatischem Durchgangston (♭7→7).',
+        desc_en:'Major scale with the chromatic passing tone (♭7→7).',
+        notes:[60,62,64,65,67,69,70,71,72] },
+      { id:'bb4', level:2, tempo:88, swing:true,
+        name_de:'Umspielung (Enclosure)', name_en:'Enclosure',
+        desc_de:'Einen Zielton von oben und unten „umkreisen" – Kern-Vokabular.',
+        desc_en:'Circling a target note from above and below – core vocabulary.',
+        notes:[69,66,67,64,61,62] },
+      { id:'bb5', level:3, tempo:100, swing:true,
+        name_de:'ii–V–I-Linie', name_en:'ii–V–I line',
+        desc_de:'Die wichtigste Akkordverbindung im Jazz, als Melodie.',
+        desc_en:'The most important chord progression in jazz, as a melody.',
+        notes:[62,65,67,69,71,69,67,65,64] },
+      { id:'bb6', level:3, tempo:116, swing:true,
+        name_de:'Bebop-Lick', name_en:'Bebop lick',
+        desc_de:'Eine längere Linie: Bebop-Skala plus Umspielung zum Schluss.',
+        desc_en:'A longer line: bebop scale plus a closing enclosure.',
+        notes:[67,69,70,71,72,71,69,67,66,67,64] }
+    ]
+  }
+};
+
+function baseNoteByMidi(midi) {
+  for (var i=0;i<BASE_NOTES.length;i++) if (BASE_NOTES[i].midi === midi) return BASE_NOTES[i];
+  return null;
+}
+// Build a full note object (sounding data + notation + fingering) from a written MIDI.
+function phraseNote(midi) {
+  var b = baseNoteByMidi(midi);
+  if (b) return noteWithSoundingData(b);
+  // Fallback for any midi outside the table: derive minimal data.
+  var pc = ((midi % 12) + 12) % 12;
+  var sharpSpell = {0:'C',1:'Cis',2:'D',3:'Es',4:'E',5:'F',6:'Fis',7:'G',8:'As',9:'A',10:'B',11:'H'};
+  var accMap = {1:'sharp',3:'flat',6:'sharp',8:'flat',10:'flat'};
+  var n = { name:sharpSpell[pc], midi:midi, display:'', staffPos:(midi-64), acc:accMap[pc]||'', chromatic:!!accMap[pc], fing:inferFingering(midi) };
+  return noteWithSoundingData(n);
+}
+function buildJazzPhrase(lesson) {
+  return lesson.notes.map(function(m){ return phraseNote(m); });
+}
+function getJazzLesson(track, id) {
+  var t = JAZZ_TRACKS[track]; if (!t) return null;
+  for (var i=0;i<t.lessons.length;i++) if (t.lessons[i].id === id) return t.lessons[i];
+  return null;
+}
+function jazzLessonUnlocked(track, idx) {
+  if (idx === 0) return true;
+  var prev = JAZZ_TRACKS[track].lessons[idx-1];
+  return !!(S.jazzProgress && S.jazzProgress[prev.id]);
+}
+
+var T = {
+  de: {
+    title: "Trompeten-Notenquiz",
+    subtitle: "Noten lesen, spielen und Jazz-Phrasen lernen",
+    language: "Sprache",
+    german: "Deutsch",
+    english: "Englisch",
+    difficulty: "Schwierigkeitsgrad",
+    mode: "Modus",
+    instrument: "Instrumentenstimmung",
+    concertA: "Kammerton",
+    tuningNote: "Einstimmton",
+    tolerance: "Erkennung",
+    strict: "Streng",
+    normal: "Normal",
+    relaxed: "Tolerant",
+    quizType: "Übungsmodus",
+    noteQuizCard: "Notenquiz",
+    noteQuizCardDesc: "Einzelne Noten lesen, erkennen und spielen.",
+    scaleQuizCard: "Tonleitern",
+    scaleQuizCardDesc: "Basale Tonleiterübungen vollständig nachspielen.",
+    scaleType: "Tonleiter",
+    root: "Grundton",
+    preview: "Vorspielen",
+    microphone: "Mikrofon",
+    micConnect: "Mikrofon verbinden",
+    micConnected: "Mikrofon verbunden",
+    disconnect: "Trennen",
+    micInfo: "In der Einstimm-Phase kannst du Trompete, Kammerton und Referenzton wählen und die Trompete stimmen. Im Quiz selbst erscheint das nicht mehr.",
+    startSetup: "Einstimmen & starten",
+    backMenu: "← Menü",
+    beginQuiz: "Quiz beginnen",
+    setupTitle: "Einstimm-Phase",
+    setupHint: "Wähle zuerst Instrument, Kammerton und Referenzton. Spiele dann den Referenzton auf der Trompete und halte ihn etwas länger stabil, bis die Stimmung passt.",
+    playReference: "♪ Referenzton",
+    tuningReady: "Eingestimmt. Du kannst jetzt das Quiz beginnen.",
+    tuningTarget: "Ziel",
+    tuningHold: "Halte den Ton etwas länger ruhig – kleine Schwankungen sind erlaubt.",
+    tuningWaiting: "Warte auf Ton…",
+    tuningStartMic: "Mikrofon starten",
+    round: "Runde",
+    menu: "Menü",
+    next: "Nächste Aufgabe →",
+    fingering: "Griffhilfe",
+    instrumentShort: "Instrument",
+    written: "Notiert",
+    sounding: "Klingend",
+    micActive: "Mikrofon aktiv – spiele den Ton und halte ihn stabil.",
+    correct: "Richtig!",
+    wrong: "Falsch –",
+    valve: "Ventil",
+    open: "offen",
+    clickName: "Name",
+    playTone: "Ton",
+    firstPermission: "Die erste Browser-Freigabe lässt sich nicht umgehen. Danach bleibt das Mikro in der Sitzung aktiv.",
+    stable: "Stabilität",
+    chooseModeFirst: "Zuerst Übungsmodus wählen",
+    playScale: "Tonleiter vorspielen",
+    scaleHint: "Spiele die angezeigte Tonleiter Ton für Ton nach. Der vorige Ton darf kurz nachklingen.",
+    scaleProgress: "Schritt",
+    correctScale: "Tonleiter richtig gespielt!",
+    wrongScale: "Tonleiter nicht korrekt.",
+    allNotesShown: "Die komplette Tonleiter ist sichtbar.",
+    showNames: "Notennamen anzeigen",
+    hideNames: "Notennamen ausblenden",
+    currentTone: "Aktueller Ton",
+    settings: "Einstellungen",
+    showSettings: "Einstellungen anzeigen",
+    hideSettings: "Einstellungen ausblenden",
+    autoAdvance: "Automatisch weiter",
+    autoAdvanceDesc: "Nach richtiger Antwort automatisch zur nächsten Aufgabe.",
+    on: "An",
+    off: "Aus",
+    startNow: "Los geht's",
+    startNowDesc: "Ohne Stimmen direkt starten",
+    tuneFirst: "Erst stimmen",
+    skipTuning: "Ohne Stimmen starten",
+    tapToContinue: "Tippen für die nächste Aufgabe",
+    autoNext: "Weiter in Kürze…",
+    practiceMode: "Übungsmodus",
+    noteQuizCard: "Notenquiz",
+    noteQuizCardDesc: "Einzelne Noten lesen, erkennen und spielen.",
+    jazzCard: "Jazz & Blues",
+    jazzCardDesc: "Klassische Jazz-, Blues- & Bebop-Phrasen Schritt für Schritt lernen.",
+    track: "Stil",
+    lesson: "Lektion",
+    level: "Stufe",
+    locked: "Erst vorige Lektion abschließen",
+    done: "Geschafft",
+    listenMode: "Hören & Lernen",
+    playMode: "Nachspielen",
+    listenModeDesc: "Phrase anhören, Ton für Ton mit Griff verfolgen.",
+    playModeDesc: "Die Phrase Ton für Ton selbst nachspielen (Mikrofon).",
+    tempo: "Tempo",
+    swing: "Swing",
+    playPhrase: "▶ Phrase abspielen",
+    stopPhrase: "■ Stopp",
+    stepBack: "← Ton",
+    stepFwd: "Ton →",
+    replayNote: "♪ Ton",
+    lessonComplete: "Lektion geschafft! 🎉",
+    nextLesson: "Nächste Lektion →",
+    backToLessons: "← Lektionen",
+    yourTurn: "Spiele diesen Ton:",
+    listenFirst: "Hör zuerst zu, dann spiel nach.",
+    phraseOf: "von"
+  },
+  en: {
+    title: "Trumpet Note Quiz",
+    subtitle: "Read notes, play them, and learn jazz phrases",
+    language: "Language",
+    german: "German",
+    english: "English",
+    difficulty: "Difficulty",
+    mode: "Mode",
+    instrument: "Instrument",
+    concertA: "Concert A",
+    tuningNote: "Tuning note",
+    tolerance: "Detection",
+    strict: "Strict",
+    normal: "Normal",
+    relaxed: "Relaxed",
+    quizType: "Practice mode",
+    noteQuizCard: "Note quiz",
+    noteQuizCardDesc: "Read, identify, and play single notes.",
+    scaleQuizCard: "Scales",
+    scaleQuizCardDesc: "Play basic scales back from start to finish.",
+    scaleType: "Scale",
+    root: "Root",
+    preview: "Preview",
+    microphone: "Microphone",
+    micConnect: "Connect microphone",
+    micConnected: "Microphone connected",
+    disconnect: "Disconnect",
+    micInfo: "In the tuning phase you can choose trumpet, concert pitch and reference tone, then tune the instrument. This does not appear during the quiz.",
+    startSetup: "Tune & start",
+    backMenu: "← Menu",
+    beginQuiz: "Begin quiz",
+    setupTitle: "Tuning phase",
+    setupHint: "First choose instrument, concert pitch and reference tone. Then play the reference tone on your trumpet and hold it a bit longer until the tuning is stable.",
+    playReference: "♪ Reference tone",
+    tuningReady: "Tuned. You can begin the quiz now.",
+    tuningTarget: "Target",
+    tuningHold: "Hold the tone a bit longer and steady – small pitch fluctuations are okay.",
+    tuningWaiting: "Waiting for a tone…",
+    tuningStartMic: "Start microphone",
+    round: "Round",
+    menu: "Menu",
+    next: "Next task →",
+    fingering: "Fingering help",
+    instrumentShort: "Instrument",
+    written: "Written",
+    sounding: "Sounding",
+    micActive: "Microphone active – play the tone and hold it steady.",
+    correct: "Correct!",
+    wrong: "Wrong –",
+    valve: "Valve",
+    open: "open",
+    clickName: "Name",
+    playTone: "Tone",
+    firstPermission: "The first browser permission cannot be avoided. After that, the mic stays active during the session.",
+    stable: "Stability",
+    chooseModeFirst: "Choose practice mode first",
+    playScale: "Play scale",
+    scaleHint: "Play the displayed scale back one note at a time. The previous tone may ring briefly.",
+    scaleProgress: "Step",
+    correctScale: "Scale played correctly!",
+    wrongScale: "Scale not correct.",
+    allNotesShown: "The full scale is visible.",
+    showNames: "Show note names",
+    hideNames: "Hide note names",
+    currentTone: "Current tone",
+    settings: "Settings",
+    showSettings: "Show settings",
+    hideSettings: "Hide settings",
+    autoAdvance: "Auto-advance",
+    autoAdvanceDesc: "Automatically move to the next task after a correct answer.",
+    on: "On",
+    off: "Off",
+    startNow: "Let's go",
+    startNowDesc: "Start right away without tuning",
+    tuneFirst: "Tune first",
+    skipTuning: "Start without tuning",
+    tapToContinue: "Tap for the next task",
+    autoNext: "Next shortly…",
+    practiceMode: "Practice mode",
+    noteQuizCard: "Note quiz",
+    noteQuizCardDesc: "Read, identify, and play single notes.",
+    jazzCard: "Jazz & Blues",
+    jazzCardDesc: "Learn classic jazz, blues & bebop phrases step by step.",
+    track: "Style",
+    lesson: "Lesson",
+    level: "Level",
+    locked: "Finish the previous lesson first",
+    done: "Done",
+    listenMode: "Listen & learn",
+    playMode: "Play back",
+    listenModeDesc: "Hear the phrase, follow it note by note with fingering.",
+    playModeDesc: "Play the phrase back note by note yourself (microphone).",
+    tempo: "Tempo",
+    swing: "Swing",
+    playPhrase: "▶ Play phrase",
+    stopPhrase: "■ Stop",
+    stepBack: "← Note",
+    stepFwd: "Note →",
+    replayNote: "♪ Note",
+    lessonComplete: "Lesson complete! 🎉",
+    nextLesson: "Next lesson →",
+    backToLessons: "← Lessons",
+    yourTurn: "Play this note:",
+    listenFirst: "Listen first, then play it back.",
+    phraseOf: "of"
+  }
+};
+
+function tr(key) { return (T[S.lang] && T[S.lang][key]) || key; }
+
+function tol() { return TOLERANCE[S.toleranceMode] || TOLERANCE.normal; }
+function needsMicInQuiz() { return S.mode === 'mic' || S.mode === 'both'; }
+
+function getRootById(id) {
+  for (var i=0;i<ROOTS.length;i++) if (ROOTS[i].id === id) return ROOTS[i];
+  return ROOTS[0];
+}
+function localizedNoteName(baseName) {
+  if (S.lang === 'de') return baseName;
+  var map = {C:'C', Cis:'C#', D:'D', Es:'Eb', E:'E', F:'F', Fis:'F#', G:'G', As:'Ab', A:'A', B:'Bb', H:'B'};
+  return map[baseName] || baseName;
+}
+function localizedDisplayName(display) {
+  if (S.lang === 'de') return display;
+  return display.replace(/cis/g,'C#').replace(/es/g,'Eb').replace(/fis/g,'F#').replace(/as/g,'Ab').replace(/\bb\b/g,'Bb').replace(/\bh\b/g,'B');
+}
+function noteLabel(note) { return note.theoryLabel || localizedNoteName(note.name); }
+function noteDisplayLabel(note) { return note.theoryDisplay || localizedDisplayName(note.display); }
+
+function accidentalToName(letterIndex, accidental, lang) {
+  var natural = lang === 'de' ? LETTERS_DE[letterIndex] : LETTERS_EN[letterIndex];
+  if (lang === 'de') {
+    if (accidental === 0) return natural;
+    if (accidental === 1) {
+      if (natural === 'H') return 'His';
+      return natural + 'is';
+    }
+    if (accidental === -1) {
+      if (natural === 'H') return 'B';
+      if (natural === 'A') return 'As';
+      if (natural === 'E') return 'Es';
+      return natural + 'es';
+    }
+  } else {
+    if (accidental === 0) return natural;
+    if (accidental === 1) return natural + '#';
+    if (accidental === -1) return natural + 'b';
+  }
+  return natural;
+}
+function midiToDisplayByLetter(letterIndex, octave) {
+  var base = ['c','d','e','f','g','a','h'][letterIndex];
+  if (octave === 4) return base + "'";
+  if (octave > 4) return base + "'".repeat(octave - 3);
+  return base;
+}
+function buildTheoryScale(rootId, scaleId) {
+  var root = getRootById(rootId);
+  var def = SCALE_TYPES[scaleId] || SCALE_TYPES.major;
+  var rootPc = (NATURAL_SEMITONES[root.letter] + root.accidental + 120) % 12;
+  var rootOctave = Math.floor(root.baseMidi / 12) - 1;
+  var rootDiatonicAbs = rootOctave * 7 + root.letter;
+  var out = [];
+  for (var i=0;i<def.intervals.length;i++) {
+    var targetMidi = root.baseMidi + def.intervals[i];
+    var absPc = (rootPc + def.intervals[i]) % 12;
+    var absLetter = root.letter + def.letterSteps[i];
+    var letterIndex = ((absLetter % 7) + 7) % 7;
+    var octave = rootOctave + Math.floor(absLetter / 7);
+    var naturalPc = NATURAL_SEMITONES[letterIndex];
+    var actualPc = ((absPc % 12) + 12) % 12;
+    var accidental = actualPc - naturalPc;
+    if (accidental > 6) accidental -= 12;
+    if (accidental < -6) accidental += 12;
+    accidental = Math.max(-1, Math.min(1, accidental)); // keep basic, theory-safe set
+    var diatonicAbs = octave * 7 + letterIndex;
+    var staffPos = diatonicAbs - (4 * 7 + 2); // E4 => 0
+    var acc = accidental === 1 ? 'sharp' : (accidental === -1 ? 'flat' : '');
+    out.push({
+      name: accidentalToName(letterIndex, accidental, 'de'),
+      theoryLabel: accidentalToName(letterIndex, accidental, S.lang),
+      theoryDisplay: accidentalToName(letterIndex, accidental, S.lang),
+      midi: targetMidi,
+      soundingMidi: targetMidi + TRANS[S.transposition].semitones,
+      soundingFreq: midiToFreq(targetMidi + TRANS[S.transposition].semitones),
+      writtenFreq: midiToFreq(targetMidi),
+      display: midiToDisplayByLetter(letterIndex, octave),
+      staffPos: staffPos,
+      acc: acc,
+      fing: inferFingering(targetMidi)
+    });
+  }
+  return out;
+}
+function inferFingering(writtenMidi) {
+  var pc = ((writtenMidi % 12) + 12) % 12;
+  var map = {
+    0:[], 1:[1,2,3], 2:[1,3], 3:[2,3], 4:[1,2], 5:[1], 6:[2], 7:[],
+    8:[2,3], 9:[1,2], 10:[1], 11:[2]
+  };
+  return map[pc] || [];
+}
+
+var audioCtx = null, micCtx = null, micStream = null, micAnalyser = null, micSource = null, micRafId = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function unlockAudio() {
+  try {
+    var ctx = ensureAudioCtx();
+    var buf = ctx.createBuffer(1, 1, ctx.sampleRate);
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch(e) {}
+}
+document.addEventListener('touchstart', unlockAudio, {once:true});
+document.addEventListener('click', unlockAudio, {once:true});
+
+function midiToFreq(midi) { return S.concertA * Math.pow(2, (midi - 69) / 12); }
+function noteWithSoundingData(n) {
+  var soundingMidi = n.midi + TRANS[S.transposition].semitones;
+  return Object.assign({}, n, { soundingMidi: soundingMidi, soundingFreq: midiToFreq(soundingMidi), writtenFreq: midiToFreq(n.midi) });
+}
+function getAllSingleNotes() { return BASE_NOTES.map(noteWithSoundingData); }
+function getActiveSingleNotes() {
+  var d = DIFF[S.difficulty];
+  return getAllSingleNotes().filter(function(n){
+    return n.midi >= d.min && n.midi <= d.max && (d.chromatic || !n.chromatic);
+  });
+}
+function getUniqueNames() {
+  var notes = getActiveSingleNotes(), seen = {}, out = [];
+  for (var i=0;i<notes.length;i++) if (!seen[notes[i].name]) { seen[notes[i].name] = true; out.push(notes[i].name); }
+  return out;
+}
+function getTuningNote() {
+  for (var i=0;i<BASE_NOTES.length;i++) if (BASE_NOTES[i].midi === S.tuningTargetWrittenMidi) return noteWithSoundingData(BASE_NOTES[i]);
+  return noteWithSoundingData(BASE_NOTES[7]);
+}
+function getCurrentPromptNote() { return S.currentNote; }
+function pickRandomSingleNote() {
+  var notes = getActiveSingleNotes();
+  return notes[Math.floor(Math.random() * notes.length)];
+}
+
+function playTone(freq, dur) {
+  var ctx = ensureAudioCtx(), t = ctx.currentTime;
+  var sustain = (typeof dur === 'number' && dur > 0) ? dur : 1.6;
+  var release = 0.45;
+  var end = t + sustain + release;
+  var master = ctx.createGain();
+  master.gain.setValueAtTime(0.001, t);
+  master.gain.linearRampToValueAtTime(0.28, t + 0.05);
+  master.gain.linearRampToValueAtTime(0.22, t + 0.2);
+  master.gain.setValueAtTime(0.22, t + sustain);
+  master.gain.exponentialRampToValueAtTime(0.001, end);
+  master.connect(ctx.destination);
+  var harmonics = [{n:1,amp:1,type:'sawtooth'},{n:2,amp:0.58,type:'sine'},{n:3,amp:0.38,type:'sine'},{n:4,amp:0.22,type:'sine'},{n:5,amp:0.14,type:'sine'},{n:6,amp:0.08,type:'sine'}];
+  for (var i=0;i<harmonics.length;i++) {
+    var h = harmonics[i], f = freq * h.n;
+    if (f > 15000) continue;
+    var osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = h.type;
+    osc.frequency.value = f;
+    var amp = h.amp * 0.18;
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(amp, t + 0.04 + i * 0.008);
+    g.gain.setValueAtTime(amp * 0.84, t + 0.22);
+    g.gain.setValueAtTime(amp * 0.76, t + sustain);
+    g.gain.exponentialRampToValueAtTime(0.001, end);
+    osc.connect(g); g.connect(master); osc.start(t); osc.stop(end + 0.2);
+  }
+}
+function pauseMicForReference(ms) {
+  var shouldResume = S.micListening && S.screen === 'quiz' && needsMicInQuiz();
+  S.micResumeAfterReference = shouldResume;
+  S.refPlaybackUntil = Date.now() + ms;
+  if (shouldResume) pauseListening();
+  setTimeout(function(){
+    if (S.micResumeAfterReference && S.screen === 'quiz' && needsMicInQuiz() && !S.answered) {
+      S.micResumeAfterReference = false;
+      startMicListening();
+    } else {
+      S.micResumeAfterReference = false;
+    }
+  }, ms + 40);
+}
+function playScale(notes, opts) {
+  // Generic phrase player (used later by jazz path). opts: {gapMs, swing}
+  opts = opts || {};
+  var gap = opts.gapMs || 480;
+  if (!notes || !notes.length) return;
+  pauseMicForReference(notes.length * gap + 1200);
+  var t = 0;
+  notes.forEach(function(n, i){
+    var delay = t;
+    setTimeout(function(){ playTone(n.soundingFreq, opts.dur || (gap * 0.9 / 1000)); }, delay);
+    var thisGap = gap;
+    if (opts.swing) thisGap = (i % 2 === 0) ? gap * 1.34 : gap * 0.66;
+    t += thisGap;
+  });
+}
+
+function buildStaffSVG(note, feedbackColor) {
+  var w=320,h=180,staffTop=50,lineSpacing=14,lines='';
+  for (var i=0;i<5;i++) {
+    var y=staffTop+i*lineSpacing;
+    lines += '<line x1="30" y1="'+y+'" x2="'+(w-20)+'" y2="'+y+'" stroke="#555" stroke-width="1.2"/>';
+  }
+  var treble = '<text x="40" y="90" font-size="58" fill="#f0c040" font-family="\'Bravura\',\'Noto Music\',serif">&#119070;</text>';
+  var noteX=180, pos=note.staffPos, bottomLineY=staffTop+4*lineSpacing, noteY=bottomLineY-pos*(lineSpacing/2);
+  var ledger='', topLineY=staffTop;
+  if (noteY > bottomLineY + 0.5) for (var ly=bottomLineY+lineSpacing; ly<=noteY+0.5; ly+=lineSpacing) ledger += '<line x1="'+(noteX-18)+'" y1="'+ly+'" x2="'+(noteX+18)+'" y2="'+ly+'" stroke="#555" stroke-width="1.2"/>';
+  if (noteY < topLineY - 0.5) for (var ly2=topLineY-lineSpacing; ly2>=noteY-0.5; ly2-=lineSpacing) ledger += '<line x1="'+(noteX-18)+'" y1="'+ly2+'" x2="'+(noteX+18)+'" y2="'+ly2+'" stroke="#555" stroke-width="1.2"/>';
+  var fill = feedbackColor || '#e8e8e8', glow='', filter='';
+  if (feedbackColor) {
+    var c = feedbackColor === '#22c55e' ? '34,197,94' : '239,68,68';
+    glow = '<defs><filter id="glow"><feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="rgb('+c+')" flood-opacity="0.7"/></filter></defs>';
+    filter = ' filter="url(#glow)"';
+  }
+  var acc='';
+  if (note.acc === 'sharp') acc = '<text x="'+(noteX-20)+'" y="'+(noteY+6)+'" font-size="18" fill="'+fill+'" font-family="serif" text-anchor="middle"'+filter+'>&#9839;</text>';
+  else if (note.acc === 'flat') acc = '<text x="'+(noteX-20)+'" y="'+(noteY+5)+'" font-size="20" fill="'+fill+'" font-family="serif" text-anchor="middle"'+filter+'>&#9837;</text>';
+  var head = '<ellipse cx="'+noteX+'" cy="'+noteY+'" rx="9" ry="6.5" fill="'+fill+'" transform="rotate(-12,'+noteX+','+noteY+')"'+filter+'/>';
+  var stemUp = noteY >= (staffTop + 2*lineSpacing);
+  var stem = stemUp ? '<line x1="'+(noteX+8.5)+'" y1="'+noteY+'" x2="'+(noteX+8.5)+'" y2="'+(noteY-40)+'" stroke="'+fill+'" stroke-width="1.8"'+filter+'/>' : '<line x1="'+(noteX-8.5)+'" y1="'+noteY+'" x2="'+(noteX-8.5)+'" y2="'+(noteY+40)+'" stroke="'+fill+'" stroke-width="1.8"'+filter+'/>';
+  return '<svg class="staff" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'+glow+lines+treble+ledger+acc+head+stem+'</svg>';
+}
+function buildPhraseNotationSVG(notes, currentStep, doneStep) {
+  if (typeof currentStep !== 'number') currentStep = -1;
+  if (typeof doneStep !== 'number') doneStep = currentStep;
+  var n0 = notes.length;
+  var w = Math.max(360, 90 + n0 * 34), h = 200, staffTop = 80, lineSpacing = 14;
+  var lines = '';
+  for (var i=0;i<5;i++) {
+    var y = staffTop + i * lineSpacing;
+    lines += '<line x1="30" y1="'+y+'" x2="'+(w-20)+'" y2="'+y+'" stroke="#555" stroke-width="1.2"/>';
+  }
+  var treble = '<text x="38" y="' + (staffTop + 40) + '" font-size="58" fill="#f0c040" font-family="\'Bravura\',\'Noto Music\',serif">&#119070;</text>';
+  var topLineY = staffTop, bottomLineY = staffTop + 4 * lineSpacing;
+  var startX = 95, spacing = Math.max(30, Math.floor((w - 130) / Math.max(1, notes.length - 1)));
+  var out = '<svg class="staff" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">' + lines + treble;
+  for (var n=0;n<notes.length;n++) {
+    var note = notes[n], noteX = startX + n * spacing, noteY = bottomLineY - note.staffPos * (lineSpacing / 2), ledger='';
+    if (noteY > bottomLineY + 0.5) for (var ly=bottomLineY+lineSpacing; ly<=noteY+0.5; ly+=lineSpacing) ledger += '<line x1="'+(noteX-14)+'" y1="'+ly+'" x2="'+(noteX+14)+'" y2="'+ly+'" stroke="#555" stroke-width="1.2"/>';
+    if (noteY < topLineY - 0.5) for (var ly2=topLineY-lineSpacing; ly2>=noteY-0.5; ly2-=lineSpacing) ledger += '<line x1="'+(noteX-14)+'" y1="'+ly2+'" x2="'+(noteX+14)+'" y2="'+ly2+'" stroke="#555" stroke-width="1.2"/>';
+    var isPast = n < doneStep, isCurrent = n === currentStep;
+    var fill = isPast ? '#22c55e' : (isCurrent ? '#f0c040' : '#e8e8e8');
+    out += ledger;
+    if (note.acc === 'sharp') out += '<text x="'+(noteX-17)+'" y="'+(noteY+6)+'" font-size="16" fill="'+fill+'" font-family="serif" text-anchor="middle">&#9839;</text>';
+    else if (note.acc === 'flat') out += '<text x="'+(noteX-17)+'" y="'+(noteY+5)+'" font-size="18" fill="'+fill+'" font-family="serif" text-anchor="middle">&#9837;</text>';
+    if (isCurrent) out += '<circle cx="'+noteX+'" cy="'+noteY+'" r="13" fill="none" stroke="#f0c040" stroke-width="1.5" opacity="0.5"/>';
+    out += '<ellipse cx="'+noteX+'" cy="'+noteY+'" rx="8" ry="6" fill="'+fill+'" transform="rotate(-12,'+noteX+','+noteY+')"/>';
+    var stemUp = noteY >= (staffTop + 2 * lineSpacing);
+    if (stemUp) out += '<line x1="'+(noteX+8)+'" y1="'+noteY+'" x2="'+(noteX+8)+'" y2="'+(noteY-34)+'" stroke="'+fill+'" stroke-width="1.6"/>';
+    else out += '<line x1="'+(noteX-8)+'" y1="'+noteY+'" x2="'+(noteX-8)+'" y2="'+(noteY+34)+'" stroke="'+fill+'" stroke-width="1.6"/>';
+  }
+  out += '</svg>';
+  return out;
+}
+function renderPhraseStrip(notes, currentStep, doneStep, showNames) {
+  if (typeof currentStep !== 'number') currentStep = -1;
+  if (typeof doneStep !== 'number') doneStep = currentStep;
+  var h = '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:10px 0">';
+  for (var i=0;i<notes.length;i++) {
+    var isPast = i < doneStep, isCurrent = i === currentStep;
+    var style = 'padding:8px 10px;border-radius:10px;border:1.5px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);min-width:48px;text-align:center;transition:all 0.25s;';
+    if (isPast) style += 'background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.4);color:#22c55e;';
+    else if (isCurrent) style += 'background:rgba(240,192,64,0.18);border-color:#f0c040;color:#f0c040;transform:scale(1.08);box-shadow:0 0 12px rgba(240,192,64,0.25);';
+    h += '<div style="'+style+'">';
+    if (showNames) h += '<div style="font-weight:bold">'+noteLabel(notes[i])+'</div><div class="small">'+noteDisplayLabel(notes[i])+'</div>';
+    else h += '<div style="font-weight:bold">&#9834;</div><div class="small">&nbsp;</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function disconnectMic() {
+  if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
+  if (micSource) try { micSource.disconnect(); } catch(e) {}
+  if (micStream) micStream.getTracks().forEach(function(t){ t.stop(); });
+  if (micCtx) micCtx.close().catch(function(){});
+  micCtx = null; micStream = null; micAnalyser = null; micSource = null;
+  S.micListening = false; S.micConnected = false;
+}
+function pauseListening() {
+  if (micRafId) { cancelAnimationFrame(micRafId); micRafId = null; }
+  S.micListening = false;
+}
+function ensureMic() {
+  if (micStream && micCtx && micAnalyser) {
+    S.micConnected = true;
+    S.permissionHint = tr('firstPermission');
+    return Promise.resolve();
+  }
+  return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}}).then(function(stream){
+    micStream = stream;
+    micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    micAnalyser = micCtx.createAnalyser();
+    micAnalyser.fftSize = 4096;
+    micSource = micCtx.createMediaStreamSource(stream);
+    micSource.connect(micAnalyser);
+    S.micConnected = true;
+    S.permissionHint = tr('firstPermission');
+  }).catch(function(){
+    S.micConnected = false;
+    S.permissionHint = tr('firstPermission');
+    throw new Error('mic');
+  });
+}
+function startMicListening() {
+  if (S.micListening) return;
+  S.stableCount = 0; S.lastMidi = -1; S.micLocked = false;
+  ensureMic().then(function(){
+    S.micListening = true;
+    render();
+    detectPitch();
+  }).catch(function(){ render(); });
+}
+
+function freqToMidiFloat(freq) { return 69 + 12 * Math.log2(freq / S.concertA); }
+function midiToRounded(freq) { return Math.round(freqToMidiFloat(freq)); }
+function centsOff(freq, targetMidi) { return Math.round(1200 * Math.log2(freq / midiToFreq(targetMidi))); }
+function findWrittenNoteBySoundingMidi(midi) {
+  var all = getAllSingleNotes();
+  for (var i=0;i<all.length;i++) if (all[i].soundingMidi === midi) return all[i];
+  return null;
+}
+function autoCorrelate(buf, sampleRate) {
+  var size = buf.length, rms = 0;
+  for (var i=0;i<size;i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / size);
+  if (rms < 0.01) return -1;
+  var r1=0, r2=size-1, thresh=0.2;
+  for (var a=0;a<size/2;a++) if (Math.abs(buf[a]) < thresh) { r1=a; break; }
+  for (var b=1;b<size/2;b++) if (Math.abs(buf[size-b]) < thresh) { r2=size-b; break; }
+  var trimmed = buf.slice(r1, r2); size = trimmed.length;
+  if (size < 64) return -1;
+  var c = new Float32Array(size);
+  for (var i2=0;i2<size;i2++) for (var j=0;j<size-i2;j++) c[i2] += trimmed[j] * trimmed[j+i2];
+  var d=0;
+  while (c[d] > c[d+1]) { d++; if (d >= size - 1) return -1; }
+  var maxVal=-1, maxPos=-1;
+  for (var i3=d;i3<size;i3++) if (c[i3] > maxVal) { maxVal = c[i3]; maxPos = i3; }
+  var T0 = maxPos;
+  if (T0 > 0 && T0 < size - 1) {
+    var x1=c[T0-1], x2=c[T0], x3=c[T0+1], aa=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
+    if (aa) T0 = T0 - bb / (2 * aa);
+  }
+  return sampleRate / T0;
+}
+function tunerNeedleLeft(cents) {
+  var clamped = Math.max(-50, Math.min(50, cents));
+  return 50 + (clamped / 50) * 40;
+}
+function renderMicDisplay(statusText, stableNow, stableTarget) {
+  var el = document.getElementById('mic-detected');
+  if (!el) return;
+  var noteText = S.micDetectedName ? (localizedNoteName(S.micDetectedName) + ' <span class="small">(' + localizedDisplayName(S.micDetectedWritten) + ')</span>') : '–';
+  var centsTxt = S.micDetectedFreq ? ((S.micDetectedCents > 0 ? '+' : '') + S.micDetectedCents + ' Cent') : tr('tuningWaiting');
+  var ticks = '';
+  for (var i=-50;i<=50;i+=10) {
+    var left = 50 + (i / 50) * 40;
+    ticks += '<div class="tuner-tick" style="left:' + left + '%"></div>';
+  }
+  var sub = [];
+  if (S.micDetectedFreq) sub.push(S.micDetectedFreq + ' Hz');
+  if (S.micDetectedFreq) sub.push(centsTxt);
+  if (typeof stableNow === 'number' && typeof stableTarget === 'number') sub.push(tr('stable') + ': ' + stableNow + '/' + stableTarget);
+  if (!S.micDetectedFreq && statusText) sub.push(statusText);
+  el.innerHTML = '<div class="tuner-wrap"><div class="tuner-note">' + noteText + '</div><div class="tuner-sub">' + (sub.length ? sub.join(' · ') : tr('tuningWaiting')) + '</div><div class="tuner-meter"><div class="tuner-scale"></div>' + ticks + '<div class="tuner-center"></div><div class="tuner-needle" style="left:' + tunerNeedleLeft(S.micDetectedCents) + '%"></div></div>' + (statusText && S.micDetectedFreq ? '<div class="tuner-sub" style="margin-top:6px">' + statusText + '</div>' : '') + '</div>';
+}
+
+function detectPitch() {
+  if (!S.micListening || !micAnalyser || S.micLocked) return;
+  if (Date.now() < S.refPlaybackUntil) {
+    micRafId = requestAnimationFrame(detectPitch);
+    return;
+  }
+
+  var buf = new Float32Array(micAnalyser.fftSize);
+  micAnalyser.getFloatTimeDomainData(buf);
+  var freq = autoCorrelate(buf, micCtx.sampleRate);
+
+  if (!(freq > 0 && freq > 130 && freq < 1400)) {
+    S.micDetectedName = '';
+    S.micDetectedWritten = '';
+    S.micDetectedFreq = 0;
+    S.micDetectedCents = 0;
+    if (S.screen === 'setup' && S.setupTuningPhase) S.tuningStableCount = 0;
+    else { S.stableCount = 0; S.lastMidi = -1; if (typeof jazzOnNoPitch === 'function') jazzOnNoPitch(); }
+    renderMicDisplay(tr('tuningWaiting'));
+    micRafId = requestAnimationFrame(detectPitch);
+    return;
+  }
+
+  S.micDetectedFreq = Math.round(freq);
+
+  if (S.screen === 'setup' && S.setupTuningPhase) {
+    var tuningTarget = getTuningNote();
+    S.micDetectedName = tuningTarget.name;
+    S.micDetectedWritten = tuningTarget.display;
+    S.micDetectedCents = centsOff(freq, tuningTarget.soundingMidi);
+    if (Math.abs(S.micDetectedCents) <= tol().tuningCents) S.tuningStableCount++;
+    else S.tuningStableCount = 0;
+    renderMicDisplay(tr('tuningHold'), S.tuningStableCount, tol().tuningStable);
+    if (S.tuningStableCount >= tol().tuningStable) {
+      S.setupTuningPhase = false;
+      S.setupTuned = true;
+      pauseListening();
+      render();
+      return;
+    }
+    micRafId = requestAnimationFrame(detectPitch);
+    return;
+  }
+
+  if (S.screen === 'jazz' && typeof jazzDetect === 'function') {
+    if (jazzDetect(freq)) { micRafId = requestAnimationFrame(detectPitch); return; }
+  }
+
+  var midi = midiToRounded(freq);
+  var mapped = findWrittenNoteBySoundingMidi(midi);
+
+  if (mapped) {
+    S.micDetectedName = mapped.name;
+    S.micDetectedWritten = mapped.display;
+    S.micDetectedCents = centsOff(freq, mapped.soundingMidi);
+    if (midi === S.lastMidi) S.stableCount++;
+    else { S.stableCount = 1; S.lastMidi = midi; }
+  } else {
+    S.micDetectedName = '';
+    S.micDetectedWritten = '';
+    S.micDetectedCents = 0;
+    S.stableCount = 0;
+    S.lastMidi = -1;
+  }
+
+  if (S.screen === 'quiz' && S.quizType === 'single' && S.mode !== 'click' && !S.micLocked) {
+    renderMicDisplay(tr('tuningHold'), S.stableCount, tol().answerStable);
+    if (mapped && S.currentNote && midi === S.currentNote.soundingMidi && Math.abs(S.micDetectedCents) <= tol().answerCents && S.stableCount >= tol().answerStable) {
+      S.micLocked = true;
+      S.micAnswer = mapped.name;
+      S.micCorrect = (mapped.midi === S.currentNote.midi);
+      pauseListening();
+      if (S.mode === 'mic') handleMicOnlyAnswer();
+      else checkBothDone();
+      render();
+      return;
+    }
+    micRafId = requestAnimationFrame(detectPitch);
+    return;
+  }
+
+  renderMicDisplay(tr('tuningWaiting'));
+  micRafId = requestAnimationFrame(detectPitch);
+}
+
+function checkBothDone() {
+  if (S.mode === 'both' && S.clickAnswer !== null && S.micAnswer !== null) {
+    S.answered = true;
+    var ok = S.clickCorrect && S.micCorrect;
+    if (ok) S.streak++; else S.streak = 0;
+    S.totalCount++; if (ok) S.correctCount++;
+    render();
+    scheduleAutoAdvance(ok);
+  }
+}
+
+function selectDifficulty(d) { S.difficulty = d; saveSettings(); render(); }
+function selectMode(m) { S.mode = m; saveSettings(); render(); }
+function selectTransposition(t) { S.transposition = t; saveSettings(); render(); }
+function selectConcertA(v) { S.concertA = parseInt(v,10); saveSettings(); render(); }
+function selectLanguage(v) { S.lang = v; saveSettings(); render(); }
+function selectTuningNote(midi) { S.tuningTargetWrittenMidi = midi; saveSettings(); render(); }
+function selectTolerance(v) { S.toleranceMode = v; saveSettings(); render(); }
+function selectQuizType(v) { S.quizType = v; render(); }
+function selectJazzTrack(v) { S.jazzTrack = v; render(); }
+function openLesson(id) {
+  var ls = getJazzLesson(S.jazzTrack, id);
+  if (!ls) return;
+  clearAutoAdvance();
+  S.jazzLessonId = id;
+  S.jazzPhrase = buildJazzPhrase(ls);
+  S.jazzStep = 0;
+  S.jazzDoneStep = 0;
+  S.jazzTempo = ls.tempo;
+  S.jazzSwing = ls.swing;
+  S.jazzMode = 'listen';
+  S.jazzPlaying = false;
+  S.jazzCompleted = false;
+  S.jazzMatchCount = 0;
+  S.jazzWaitRelease = false;
+  S.jazzReleaseCount = 0;
+  S.screen = 'jazz';
+  render();
+}
+function jazzCurrentLesson() { return getJazzLesson(S.jazzTrack, S.jazzLessonId); }
+function jazzGapMs() { return Math.round(60000 / S.jazzTempo); }
+function setJazzStep(i) {
+  if (!S.jazzPhrase.length) return;
+  S.jazzStep = Math.max(0, Math.min(S.jazzPhrase.length - 1, i));
+  render();
+}
+function jazzStepBack() { setJazzStep(S.jazzStep - 1); }
+function jazzStepFwd() { setJazzStep(S.jazzStep + 1); }
+function jazzReplayNote() {
+  var n = S.jazzPhrase[S.jazzStep];
+  if (n) { pauseMicForReference(jazzGapMs() + 600); playTone(n.soundingFreq, jazzGapMs()/1000 * 0.9); }
+}
+function jazzPlayPhrase() {
+  if (!S.jazzPhrase.length) return;
+  playScale(S.jazzPhrase, { gapMs: jazzGapMs(), swing: S.jazzSwing });
+}
+function backToLessons() {
+  clearAutoAdvance();
+  pauseListening();
+  S.screen = 'menu';
+  S.quizType = 'jazz';
+  render();
+}
+function markLessonDone(id) {
+  if (!S.jazzProgress) S.jazzProgress = {};
+  S.jazzProgress[id] = true;
+  saveSettings();
+}
+function toggleAutoAdvance() { S.autoAdvance = !S.autoAdvance; saveSettings(); render(); }
+function toggleSettings() { S.showSettings = !S.showSettings; render(); }
+
+function clearAutoAdvance() {
+  if (S.autoAdvanceTimer) { clearTimeout(S.autoAdvanceTimer); S.autoAdvanceTimer = null; }
+}
+function scheduleAutoAdvance(wasCorrect) {
+  clearAutoAdvance();
+  if (!S.autoAdvance) return;
+  // Give a touch more time on wrong answers so the learner can read the correction.
+  var delay = wasCorrect ? 850 : 1700;
+  S.autoAdvanceTimer = setTimeout(function(){
+    S.autoAdvanceTimer = null;
+    if (S.screen === 'quiz' && S.answered) nextTask();
+  }, delay);
+}
+
+function goSetup() {
+  S.screen = 'setup';
+  S.setupTuned = false;
+  S.setupTuningPhase = false;
+  S.tuningStableCount = 0;
+  S.micDetectedName = '';
+  S.micDetectedWritten = '';
+  S.micDetectedFreq = 0;
+  S.micDetectedCents = 0;
+  render();
+}
+function startSetupTuning() {
+  S.setupTuned = false;
+  S.setupTuningPhase = true;
+  S.tuningStableCount = 0;
+  startMicListening();
+}
+// Skip tuning entirely and jump straight into the quiz.
+function startQuizNow() {
+  S.setupTuned = true;
+  beginQuiz();
+}
+function beginQuiz() {
+  clearAutoAdvance();
+  S.screen = 'quiz';
+  S.round = 0; S.correctCount = 0; S.totalCount = 0; S.streak = 0;
+  nextTask();
+}
+function nextTask() {
+  clearAutoAdvance();
+  pauseListening();
+  S.round++;
+  S.currentNote = pickRandomSingleNote();
+  S.answered = false;
+  S.clickAnswer = null;
+  S.micAnswer = null;
+  S.clickCorrect = null;
+  S.micCorrect = null;
+  S.micLocked = false;
+  S.micDetectedName = '';
+  S.micDetectedWritten = '';
+  S.micDetectedFreq = 0;
+  S.micDetectedCents = 0;
+  S.stableCount = 0;
+  S.lastMidi = -1;
+  render();
+  if (needsMicInQuiz()) startMicListening();
+}
+function answerClick(name) {
+  if (S.clickAnswer !== null) return;
+  S.clickAnswer = name;
+  var promptNote = getCurrentPromptNote();
+  S.clickCorrect = (promptNote && name === promptNote.name);
+  if (S.mode === 'click') {
+    S.answered = true;
+    if (S.clickCorrect) S.streak++; else S.streak = 0;
+    S.totalCount++;
+    if (S.clickCorrect) S.correctCount++;
+    render();
+    scheduleAutoAdvance(S.clickCorrect);
+  } else {
+    checkBothDone();
+  }
+}
+function playRef() {
+  if (S.screen === 'setup') {
+    var t = getTuningNote();
+    if (t) playTone(t.soundingFreq);
+    return;
+  }
+  var n = getCurrentPromptNote();
+  if (n) {
+    pauseMicForReference(2600);
+    playTone(n.soundingFreq);
+  }
+}
+function toggleFingering() { S.showFingering = !S.showFingering; render(); }
+function buildFingeringSVG(note) {
+  var w=160,h=80,cx=[40,80,120],cy=32,r=18,pressed=note.fing || [];
+  var svg = '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg" style="width:140px;height:70px">';
+  for (var i=0;i<3;i++) {
+    var valveNum=i+1,isPressed=pressed.indexOf(valveNum)!==-1;
+    svg += '<circle cx="'+cx[i]+'" cy="'+cy+'" r="'+r+'" fill="'+(isPressed?'#f0c040':'transparent')+'" stroke="'+(isPressed?'#f0c040':'#555')+'" stroke-width="2"/>';
+    svg += '<text x="'+cx[i]+'" y="'+(cy+6)+'" text-anchor="middle" font-size="16" font-family="Georgia,serif" fill="'+(isPressed?'#1a1a2e':'#888')+'" font-weight="bold">'+valveNum+'</text>';
+  }
+  svg += '<text x="'+(w/2)+'" y="'+(h-4)+'" text-anchor="middle" font-size="12" font-family="Georgia,serif" fill="#aaa">'+(pressed.length===0?tr('open'):tr('valve')+' '+pressed.join(' + '))+'</text></svg>';
+  return svg;
+}
+function goMenu() { clearAutoAdvance(); pauseListening(); S.screen = 'menu'; render(); }
+function startMic() { startMicListening(); }
+function disconnectMicPersistent() { disconnectMic(); render(); }
+function handleMicOnlyAnswer() {
+  if (S.mode === 'mic' && S.micAnswer !== null && !S.answered) {
+    S.answered = true;
+    if (S.micCorrect) S.streak++; else S.streak = 0;
+    S.totalCount++;
+    if (S.micCorrect) S.correctCount++;
+    render();
+    scheduleAutoAdvance(S.micCorrect);
+  }
+}
+
+function render() {
+  var app = document.getElementById('app');
+  if (S.screen === 'menu') renderMenu(app);
+  else if (S.screen === 'setup') renderSetup(app);
+  else if (S.screen === 'jazz') renderJazz(app);
+  else renderQuiz(app);
+}
+function renderToggle(labelKey, descKey, isOn, onClickFn) {
+  var h = '<div class="opt-btn" onclick="'+onClickFn+'" style="display:flex;justify-content:space-between;align-items:center">';
+  h += '<div><div class="opt-label">' + tr(labelKey) + '</div>';
+  if (descKey) h += '<div class="opt-desc">' + tr(descKey) + '</div>';
+  h += '</div>';
+  h += '<div style="flex:0 0 auto;margin-left:10px;padding:6px 14px;border-radius:20px;font-weight:bold;font-size:0.85em;'
+     + (isOn ? 'background:rgba(34,197,94,0.25);color:#22c55e;border:1.5px solid #22c55e;' : 'background:rgba(255,255,255,0.08);color:#888;border:1.5px solid rgba(255,255,255,0.15);')
+     + '">' + (isOn ? tr('on') : tr('off')) + '</div>';
+  h += '</div>';
+  return h;
+}
+function renderSettingsPanel() {
+  var h = '<div class="menu-section">';
+  h += '<h2 onclick="toggleSettings()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+     + tr('settings') + '<span style="font-size:0.8em;color:#aaa">' + (S.showSettings ? '&#9650;' : '&#9660;') + '</span></h2>';
+  if (S.showSettings) {
+    h += '<div class="opt-grid" style="margin-bottom:10px">' + renderToggle('autoAdvance','autoAdvanceDesc',S.autoAdvance,'toggleAutoAdvance()') + '</div>';
+
+    h += '<h2 style="font-size:0.95em">' + tr('language') + '</h2><div class="inline-grid" style="margin-bottom:10px">';
+    h += '<div class="opt-btn' + (S.lang==='de'?' selected':'') + '" onclick="selectLanguage(\'de\')"><div class="opt-label">' + tr('german') + '</div></div>';
+    h += '<div class="opt-btn' + (S.lang==='en'?' selected':'') + '" onclick="selectLanguage(\'en\')"><div class="opt-label">' + tr('english') + '</div></div>';
+    h += '</div>';
+
+    h += '<h2 style="font-size:0.95em">' + tr('instrument') + '</h2><div class="opt-grid" style="margin-bottom:10px">';
+    ['Bb','C','Eb'].forEach(function(t){
+      h += '<div class="opt-btn' + (S.transposition===t?' selected':'') + '" onclick="selectTransposition(\''+t+'\')"><div class="opt-label">' + TRANS[t]['label_'+S.lang] + '</div><div class="opt-desc">' + TRANS[t]['desc_'+S.lang] + '</div></div>';
+    });
+    h += '</div>';
+
+    h += '<h2 style="font-size:0.95em">' + tr('concertA') + '</h2><div class="inline-grid" style="margin-bottom:10px">';
+    [440,442,443,444].forEach(function(v){
+      h += '<div class="opt-btn' + (S.concertA===v?' selected':'') + '" onclick="selectConcertA(' + v + ')"><div class="opt-label">A = ' + v + ' Hz</div></div>';
+    });
+    h += '</div>';
+
+    h += '<h2 style="font-size:0.95em">' + tr('tolerance') + '</h2><div class="inline-grid">';
+    ['strict','normal','relaxed'].forEach(function(k){
+      h += '<div class="opt-btn' + (S.toleranceMode===k?' selected':'') + '" onclick="selectTolerance(\''+k+'\')"><div class="opt-label">' + tr(k) + '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+function renderMenu(app) {
+  var h = '<h1>&#127930; ' + tr('title') + '</h1>';
+  h += '<div class="subtitle">' + tr('subtitle') + '</div>';
+
+  // Practice mode: note quiz vs jazz path
+  h += '<div class="menu-section"><h2>' + tr('practiceMode') + '</h2><div class="opt-grid">';
+  h += '<div class="opt-btn' + (S.quizType==='single'?' selected':'') + '" onclick="selectQuizType(\'single\')"><div class="opt-label">&#127925; ' + tr('noteQuizCard') + '</div><div class="opt-desc">' + tr('noteQuizCardDesc') + '</div></div>';
+  h += '<div class="opt-btn' + (S.quizType==='jazz'?' selected':'') + '" onclick="selectQuizType(\'jazz\')"><div class="opt-label">&#127927; ' + tr('jazzCard') + '</div><div class="opt-desc">' + tr('jazzCardDesc') + '</div></div>';
+  h += '</div></div>';
+
+  if (S.quizType === 'jazz') {
+    h += renderJazzLessonPicker();
+    h += renderSettingsPanel();
+    app.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="menu-section"><h2>' + tr('mode') + '</h2><div class="opt-grid">';
+  ['click','mic','both'].forEach(function(m){
+    h += '<div class="opt-btn' + (S.mode===m?' selected':'') + '" onclick="selectMode(\''+m+'\')"><div class="opt-label">' + MODES[m]['label_'+S.lang] + '</div><div class="opt-desc">' + MODES[m]['desc_'+S.lang] + '</div></div>';
+  });
+  h += '</div></div>';
+
+  h += '<div class="menu-section"><h2>' + tr('difficulty') + '</h2><div class="opt-grid">';
+  ['veryeasy','easy','medium','hard','expert'].forEach(function(d){
+    h += '<div class="opt-btn' + (S.difficulty===d?' selected':'') + '" onclick="selectDifficulty(\''+d+'\')"><div class="opt-label">' + DIFF[d]['label_'+S.lang] + '</div><div class="opt-desc">' + DIFF[d]['desc_'+S.lang] + '</div></div>';
+  });
+  h += '</div></div>';
+
+  h += renderSettingsPanel();
+
+  // Smart start: click-only needs no tuning, so go straight in.
+  if (S.mode === 'click') {
+    h += '<button class="start-btn" onclick="startQuizNow()">' + tr('startNow') + '</button>';
+  } else {
+    h += '<button class="start-btn" onclick="goSetup()">' + tr('tuneFirst') + '</button>';
+    h += '<button class="start-btn" style="background:rgba(255,255,255,0.08);color:#ccc;margin-top:8px" onclick="startQuizNow()">' + tr('skipTuning') + '</button>';
+  }
+  app.innerHTML = h;
+}
+function renderJazzLessonPicker() {
+  var h = '<div class="menu-section"><h2>' + tr('track') + '</h2><div class="inline-grid">';
+  Object.keys(JAZZ_TRACKS).forEach(function(tk){
+    h += '<div class="opt-btn' + (S.jazzTrack===tk?' selected':'') + '" onclick="selectJazzTrack(\''+tk+'\')"><div class="opt-label">' + JAZZ_TRACKS[tk]['name_'+S.lang] + '</div></div>';
+  });
+  h += '</div></div>';
+
+  var track = JAZZ_TRACKS[S.jazzTrack];
+  h += '<div class="menu-section"><h2>' + JAZZ_TRACKS[S.jazzTrack]['name_'+S.lang] + ' · ' + tr('lesson') + 's</h2>';
+  h += '<div class="opt-desc" style="margin-bottom:10px">' + track['desc_'+S.lang] + '</div>';
+  h += '<div class="opt-grid">';
+  track.lessons.forEach(function(ls, idx){
+    var unlocked = jazzLessonUnlocked(S.jazzTrack, idx);
+    var doneFlag = S.jazzProgress && S.jazzProgress[ls.id];
+    var badge = '';
+    if (doneFlag) badge = '<span style="color:#22c55e;font-weight:bold">&#10003; ' + tr('done') + '</span>';
+    else if (!unlocked) badge = '<span style="color:#888">&#128274;</span>';
+    var style = unlocked ? '' : 'opacity:0.5;';
+    var click = unlocked ? ('openLesson(\''+ls.id+'\')') : '';
+    h += '<div class="opt-btn" style="'+style+(unlocked?'':'cursor:default')+'" '+(unlocked?'onclick="'+click+'"':'')+'>';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    h += '<div class="opt-label">' + tr('level') + ' ' + ls.level + ' · ' + ls['name_'+S.lang] + '</div>' + badge;
+    h += '</div>';
+    h += '<div class="opt-desc">' + (unlocked ? ls['desc_'+S.lang] : tr('locked')) + '</div>';
+    h += '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+function renderSetup(app) {
+  var tuning = getTuningNote();
+  var h = '<h1>' + tr('setupTitle') + '</h1>';
+  h += '<div class="subtitle">' + tr('setupHint') + '</div>';
+
+  h += '<div class="menu-section"><h2>' + tr('instrument') + '</h2><div class="opt-grid">';
+  ['Bb','C','Eb'].forEach(function(t){
+    h += '<div class="opt-btn' + (S.transposition===t?' selected':'') + '" onclick="selectTransposition(\''+t+'\')"><div class="opt-label">' + TRANS[t]['label_'+S.lang] + '</div><div class="opt-desc">' + TRANS[t]['desc_'+S.lang] + '</div></div>';
+  });
+  h += '</div></div>';
+
+  h += '<div class="menu-section"><h2>' + tr('tuningNote') + '</h2><div class="inline-grid">';
+  [65,67,69,72].forEach(function(midi){
+    var found = null;
+    for (var i=0;i<BASE_NOTES.length;i++) if (BASE_NOTES[i].midi === midi) found = noteWithSoundingData(BASE_NOTES[i]);
+    h += '<div class="opt-btn' + (S.tuningTargetWrittenMidi===midi?' selected':'') + '" onclick="selectTuningNote(' + midi + ')"><div class="opt-label">' + (found ? noteDisplayLabel(found) : midi) + '</div></div>';
+  });
+  h += '</div></div>';
+
+  h += '<div class="feedback" style="background:rgba(99,102,241,0.12);color:#c4b5fd;border:1.5px solid rgba(99,102,241,0.3)">' +
+       tr('written') + ': <strong>' + noteDisplayLabel(tuning) + '</strong> · ' + tr('sounding') + ': ' + tuning.soundingFreq.toFixed(1) + ' Hz · ' + TRANS[S.transposition]['label_'+S.lang] +
+       '</div>';
+
+  h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">';
+  h += '<button class="ref-btn" onclick="playRef()">' + tr('playReference') + '</button>';
+  h += '<button class="ref-btn" onclick="startSetupTuning()">' + tr('tuningStartMic') + '</button>';
+  h += '</div>';
+
+  h += '<div class="mic-area"><div id="mic-detected"><div class="mic-status">' + (S.setupTuned ? tr('tuningReady') : tr('tuningWaiting')) + '</div></div></div>';
+  h += '<div class="nav-row"><button class="nav-btn back" onclick="goMenu()">' + tr('backMenu') + '</button><button class="nav-btn next" onclick="beginQuiz()">' + tr('beginQuiz') + '</button></div>';
+  h += '<button class="start-btn" style="background:rgba(255,255,255,0.08);color:#ccc;margin-top:10px" onclick="startQuizNow()">' + tr('skipTuning') + '</button>';
+
+  app.innerHTML = h;
+  renderMicDisplay(S.setupTuned ? tr('tuningReady') : tr('tuningWaiting'), S.tuningStableCount, tol().tuningStable);
+}
+function renderQuiz(app) {
+  var promptNote = getCurrentPromptNote();
+  var pct = S.totalCount > 0 ? Math.round(S.correctCount / S.totalCount * 100) : 0;
+  var h = '';
+  h += '<div class="score-bar"><span>' + tr('round') + ' ' + S.round + '</span><span class="score-streak">' + (S.streak > 0 ? '&#128293; ' + S.streak : '') + '</span><span class="score-pct">' + S.correctCount + '/' + S.totalCount + (S.totalCount > 0 ? ' (' + pct + '%)' : '') + '</span></div>';
+
+  var fbColor = null;
+  if (S.answered) {
+    var ok = S.mode === 'click' ? S.clickCorrect : (S.mode === 'mic' ? S.micCorrect : (S.clickCorrect && S.micCorrect));
+    fbColor = ok ? '#22c55e' : '#ef4444';
+  }
+  h += buildStaffSVG(promptNote, fbColor);
+  h += '<div class="small" style="text-align:center;margin-top:-2px">' + tr('instrumentShort') + ': ' + TRANS[S.transposition]['label_'+S.lang] + '</div>';
+
+  h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">';
+  h += '<button class="ref-btn" onclick="playRef()">' + tr('playReference') + '</button>';
+  h += '<button class="ref-btn" onclick="toggleFingering()" style="' + (S.showFingering ? 'background:rgba(240,192,64,0.25);border-color:#f0c040' : '') + '">&#9997; ' + tr('fingering') + '</button>';
+  h += '</div>';
+
+  if (S.answered) {
+    h += '<div class="small" style="text-align:center">' + tr('written') + ': ' + noteDisplayLabel(promptNote) + ' · ' + tr('sounding') + ': ' + promptNote.soundingFreq.toFixed(1) + ' Hz</div>';
+  } else {
+    h += '<div class="small" style="text-align:center">&nbsp;</div>';
+  }
+
+  if (S.showFingering && promptNote) {
+    h += '<div style="text-align:center;margin:6px 0">' + buildFingeringSVG(promptNote) + '</div>';
+  }
+
+  if (S.mode === 'both' && !S.answered) {
+    h += '<div class="combo-status">' + (S.clickAnswer !== null ? '&#10003; ' + tr('clickName') : '&#9203; ' + tr('clickName')) + ' &middot; ' + (S.micAnswer !== null ? '&#10003; ' + tr('playTone') : '&#9203; ' + tr('playTone')) + '</div>';
+  }
+
+  if (S.mode === 'click' || S.mode === 'both') {
+    h += '<div class="note-btns">';
+    getUniqueNames().forEach(function(n){
+      var cls = 'note-btn', dis = '';
+      if (S.clickAnswer !== null) {
+        dis = ' disabled';
+        if (n === promptNote.name) cls += ' correct';
+        else if (n === S.clickAnswer && !S.clickCorrect) cls += ' wrong';
+        else cls += ' dimmed';
+      }
+      h += '<button class="' + cls + '"' + dis + ' onclick="answerClick(\'' + n + '\')">' + localizedNoteName(n) + '</button>';
+    });
+    h += '</div>';
+  }
+
+  if (needsMicInQuiz()) {
+    h += '<div class="mic-area"><div id="mic-detected"><div class="mic-status">' + tr('micActive') + '</div></div></div>';
+  }
+
+  if (S.answered) {
+    var allCorrect = S.mode === 'click' ? S.clickCorrect : (S.mode === 'mic' ? S.micCorrect : (S.clickCorrect && S.micCorrect));
+    var fingLabel = (promptNote.fing || []).length === 0 ? tr('open') : tr('valve') + ' ' + promptNote.fing.join('+');
+    h += '<div class="feedback ' + (allCorrect ? 'correct' : 'wrong') + '">' + (allCorrect ? '&#10003; ' + tr('correct') + ' ' : '&#10007; ' + tr('wrong') + ' ') + noteLabel(promptNote) + ' (' + noteDisplayLabel(promptNote) + ') · ' + fingLabel + '</div>';
+    var nextLabel = (S.autoAdvance && S.autoAdvanceTimer) ? tr('autoNext') : tr('next');
+    h += '<div class="nav-row"><button class="nav-btn back" onclick="goMenu()">' + tr('menu') + '</button><button class="nav-btn next" onclick="nextTask()">' + nextLabel + '</button></div>';
+  }
+
+  app.innerHTML = h;
+  if (needsMicInQuiz()) {
+    renderMicDisplay(tr('tuningHold'), S.stableCount, tol().answerStable);
+  }
+}
+
+function renderJazz(app) {
+  var ls = jazzCurrentLesson();
+  if (!ls) { backToLessons(); return; }
+  var phrase = S.jazzPhrase;
+  var cur = phrase[S.jazzStep];
+  var h = '';
+
+  h += '<div class="score-bar"><span>' + JAZZ_TRACKS[S.jazzTrack]['name_'+S.lang] + ' · ' + tr('level') + ' ' + ls.level + '</span><span class="score-pct">' + (S.jazzStep+1) + ' ' + tr('phraseOf') + ' ' + phrase.length + '</span></div>';
+  h += '<h2 style="text-align:center;margin:2px 0 6px">' + ls['name_'+S.lang] + '</h2>';
+  h += '<div class="small" style="text-align:center;margin-bottom:4px">' + tr('instrumentShort') + ': ' + TRANS[S.transposition]['label_'+S.lang] + '</div>';
+
+  // Mode toggle (Listen / Play). Play-back via mic is wired in CP4.
+  h += '<div class="menu-section" style="padding:8px"><div class="inline-grid">';
+  h += '<div class="opt-btn' + (S.jazzMode==='listen'?' selected':'') + '" onclick="setJazzMode(\'listen\')"><div class="opt-label">&#128066; ' + tr('listenMode') + '</div></div>';
+  h += '<div class="opt-btn' + (S.jazzMode==='play'?' selected':'') + '" onclick="setJazzMode(\'play\')"><div class="opt-label">&#127932; ' + tr('playMode') + '</div></div>';
+  h += '</div></div>';
+
+  // Notation of the whole phrase, with current note highlighted
+  h += '<div style="margin-top:4px">' + buildPhraseNotationSVG(phrase, S.jazzStep, S.jazzDoneStep) + '</div>';
+  h += renderPhraseStrip(phrase, S.jazzStep, S.jazzDoneStep, S.jazzShowNames);
+
+  // Current note detail + fingering
+  if (cur) {
+    h += '<div class="combo-status">' + tr('currentTone') + ': <strong>' + noteLabel(cur) + '</strong> (' + noteDisplayLabel(cur) + ')</div>';
+    h += '<div style="text-align:center;margin:4px 0">' + buildFingeringSVG(cur) + '</div>';
+  }
+
+  if (S.jazzCompleted) {
+    h += '<div class="feedback correct">&#10003; ' + tr('lessonComplete') + '</div>';
+  }
+
+  // Controls
+  h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">';
+  h += '<button class="ref-btn" onclick="jazzPlayPhrase()">' + tr('playPhrase') + '</button>';
+  h += '<button class="ref-btn" onclick="jazzReplayNote()">' + tr('replayNote') + '</button>';
+  h += '</div>';
+  h += '<div class="nav-row"><button class="nav-btn back" onclick="jazzStepBack()">' + tr('stepBack') + '</button><button class="nav-btn next" onclick="jazzStepFwd()">' + tr('stepFwd') + '</button></div>';
+
+  h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn back" onclick="backToLessons()">' + tr('backToLessons') + '</button>';
+  if (S.jazzMode === 'play') h += '<button class="nav-btn back" onclick="0">' + tr('listenFirst') + '</button>';
+  h += '</div>';
+
+  app.innerHTML = h;
+}
+function setJazzMode(m) { S.jazzMode = m; render(); }
+
+
+document.addEventListener('keydown', function(e){
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if (S.screen === 'quiz') {
+    if ((e.key === ' ' || e.key === 'Enter')) {
+      e.preventDefault();
+      if (S.answered) { clearAutoAdvance(); nextTask(); }
+      else playRef();
+      return;
+    }
+    if ((S.mode === 'click' || S.mode === 'both') && !S.answered && /^[1-9]$/.test(e.key)) {
+      var names = getUniqueNames();
+      var idx = parseInt(e.key, 10) - 1;
+      if (idx < names.length) { answerClick(names[idx]); }
+      return;
+    }
+    if (e.key === 'f' || e.key === 'F') { toggleFingering(); return; }
+  }
+});
+
+loadSettings();
+render();
+window.addEventListener('beforeunload', function(){ disconnectMic(); });
+
+</script>
+</body>
+</html>
