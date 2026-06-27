@@ -1048,6 +1048,8 @@ function openLesson(id) {
   var ls = getJazzLesson(S.jazzTrack, id);
   if (!ls) return;
   clearAutoAdvance();
+  pauseListening();
+  clearJazzTimers();
   S.jazzLessonId = id;
   S.jazzPhrase = buildJazzPhrase(ls);
   S.jazzStep = 0;
@@ -1068,21 +1070,135 @@ function jazzGapMs() { return Math.round(60000 / S.jazzTempo); }
 function setJazzStep(i) {
   if (!S.jazzPhrase.length) return;
   S.jazzStep = Math.max(0, Math.min(S.jazzPhrase.length - 1, i));
+  if (S.jazzStep > S.jazzDoneStep) S.jazzDoneStep = S.jazzStep;
   render();
 }
 function jazzStepBack() { setJazzStep(S.jazzStep - 1); }
-function jazzStepFwd() { setJazzStep(S.jazzStep + 1); }
+function jazzStepFwd() {
+  // At the last note, one more "forward" in Listen mode finishes the lesson.
+  if (S.jazzStep >= S.jazzPhrase.length - 1) {
+    if (S.jazzMode === 'listen' && !S.jazzCompleted) completeJazzLesson();
+    return;
+  }
+  setJazzStep(S.jazzStep + 1);
+}
 function jazzReplayNote() {
   var n = S.jazzPhrase[S.jazzStep];
   if (n) { pauseMicForReference(jazzGapMs() + 600); playTone(n.soundingFreq, jazzGapMs()/1000 * 0.9); }
 }
+var jazzPlayTimers = [];
+function clearJazzTimers() { jazzPlayTimers.forEach(function(t){ clearTimeout(t); }); jazzPlayTimers = []; }
+function jazzStopPhrase() { clearJazzTimers(); S.jazzPlaying = false; render(); }
 function jazzPlayPhrase() {
   if (!S.jazzPhrase.length) return;
-  playScale(S.jazzPhrase, { gapMs: jazzGapMs(), swing: S.jazzSwing });
+  clearJazzTimers();
+  var gap = jazzGapMs();
+  // In Play mode the phrase is only a reference – don't move the learner's place.
+  if (S.jazzMode === 'play') {
+    playScale(S.jazzPhrase, { gapMs: gap, swing: S.jazzSwing });
+    return;
+  }
+  // Listen mode: walk the highlight through the phrase note by note, then finish.
+  S.jazzPlaying = true;
+  pauseMicForReference(S.jazzPhrase.length * gap + 1200);
+  var t = 0;
+  S.jazzPhrase.forEach(function(n, i){
+    jazzPlayTimers.push(setTimeout(function(){
+      S.jazzStep = i;
+      if (i > S.jazzDoneStep) S.jazzDoneStep = i;
+      playTone(n.soundingFreq, gap / 1000 * 0.9);
+      render();
+    }, t));
+    t += S.jazzSwing ? ((i % 2 === 0) ? gap * 1.34 : gap * 0.66) : gap;
+  });
+  jazzPlayTimers.push(setTimeout(function(){
+    S.jazzPlaying = false;
+    S.jazzDoneStep = S.jazzPhrase.length;
+    if (!S.jazzCompleted) completeJazzLesson(); else render();
+  }, t + 300));
+}
+
+// ---- Lesson completion & progression ----
+function completeJazzLesson() {
+  if (!S.jazzLessonId) return;
+  clearJazzTimers();
+  S.jazzPlaying = false;
+  S.jazzCompleted = true;
+  S.jazzDoneStep = S.jazzPhrase.length;
+  markLessonDone(S.jazzLessonId); // unlocks the next lesson and persists it
+  render();
+}
+function jazzLessonIndex() {
+  var t = JAZZ_TRACKS[S.jazzTrack];
+  for (var i=0;i<t.lessons.length;i++) if (t.lessons[i].id === S.jazzLessonId) return i;
+  return -1;
+}
+function jazzHasNextLesson() {
+  var i = jazzLessonIndex();
+  return i >= 0 && (i + 1) < JAZZ_TRACKS[S.jazzTrack].lessons.length;
+}
+function jazzNextLesson() {
+  var i = jazzLessonIndex();
+  if (jazzHasNextLesson()) openLesson(JAZZ_TRACKS[S.jazzTrack].lessons[i+1].id);
+  else backToLessons();
+}
+
+// ---- Play-along (microphone) detection ----
+// Called from detectPitch() while on the jazz screen. Returns true when it has
+// handled the frame (Play mode), false to let normal detection continue.
+function jazzAdvanceAfterMatch() {
+  S.jazzMatchCount = 0;
+  S.jazzDoneStep = Math.max(S.jazzDoneStep, S.jazzStep + 1);
+  if (S.jazzStep >= S.jazzPhrase.length - 1) {
+    S.jazzWaitRelease = false;
+    pauseListening();
+    completeJazzLesson();
+    return;
+  }
+  S.jazzStep++;
+  S.jazzWaitRelease = true;   // require a short silence before the next note counts
+  S.jazzReleaseCount = 0;
+  render();
+}
+function jazzDetect(freq) {
+  if (S.jazzMode !== 'play' || S.jazzCompleted) return false;
+  var cur = S.jazzPhrase[S.jazzStep];
+  if (!cur) return false;
+  var midi = midiToRounded(freq);
+  var mapped = findWrittenNoteBySoundingMidi(midi);
+  S.micDetectedFreq = Math.round(freq);
+  S.micDetectedName = mapped ? mapped.name : '';
+  S.micDetectedWritten = mapped ? mapped.display : '';
+  S.micDetectedCents = centsOff(freq, cur.soundingMidi); // needle shows distance to the target
+  // Gate stays closed until the player releases (silence), so a single sustained
+  // tone or a repeated pitch can't roll through several notes at once.
+  if (S.jazzWaitRelease) {
+    renderMicDisplay(tr('yourTurn'), 0, tol().answerStable);
+    return true;
+  }
+  var onTarget = (midi === cur.soundingMidi) && (Math.abs(S.micDetectedCents) <= tol().answerCents);
+  if (onTarget) {
+    S.jazzMatchCount++;
+    renderMicDisplay(tr('yourTurn'), S.jazzMatchCount, tol().answerStable);
+    if (S.jazzMatchCount >= tol().answerStable) jazzAdvanceAfterMatch();
+  } else {
+    S.jazzMatchCount = 0;
+    renderMicDisplay(tr('yourTurn'), 0, tol().answerStable);
+  }
+  return true;
+}
+function jazzOnNoPitch() {
+  if (S.jazzMode !== 'play') return;
+  S.jazzMatchCount = 0;
+  if (S.jazzWaitRelease) {
+    S.jazzReleaseCount++;
+    if (S.jazzReleaseCount >= 3) { S.jazzWaitRelease = false; S.jazzReleaseCount = 0; }
+  }
 }
 function backToLessons() {
   clearAutoAdvance();
   pauseListening();
+  clearJazzTimers();
   S.screen = 'menu';
   S.quizType = 'jazz';
   render();
@@ -1443,7 +1559,7 @@ function renderJazz(app) {
   h += '<h2 style="text-align:center;margin:2px 0 6px">' + ls['name_'+S.lang] + '</h2>';
   h += '<div class="small" style="text-align:center;margin-bottom:4px">' + tr('instrumentShort') + ': ' + TRANS[S.transposition]['label_'+S.lang] + '</div>';
 
-  // Mode toggle (Listen / Play). Play-back via mic is wired in CP4.
+  // Mode toggle (Listen / Play).
   h += '<div class="menu-section" style="padding:8px"><div class="inline-grid">';
   h += '<div class="opt-btn' + (S.jazzMode==='listen'?' selected':'') + '" onclick="setJazzMode(\'listen\')"><div class="opt-label">&#128066; ' + tr('listenMode') + '</div></div>';
   h += '<div class="opt-btn' + (S.jazzMode==='play'?' selected':'') + '" onclick="setJazzMode(\'play\')"><div class="opt-label">&#127932; ' + tr('playMode') + '</div></div>';
@@ -1455,8 +1571,17 @@ function renderJazz(app) {
 
   // Current note detail + fingering
   if (cur) {
-    h += '<div class="combo-status">' + tr('currentTone') + ': <strong>' + noteLabel(cur) + '</strong> (' + noteDisplayLabel(cur) + ')</div>';
+    var curLabel = (S.jazzMode === 'play') ? tr('yourTurn') : (tr('currentTone') + ':');
+    h += '<div class="combo-status">' + curLabel + ' <strong>' + noteLabel(cur) + '</strong> (' + noteDisplayLabel(cur) + ')</div>';
     h += '<div style="text-align:center;margin:4px 0">' + buildFingeringSVG(cur) + '</div>';
+  }
+
+  // Microphone listening area (Play mode only)
+  if (S.jazzMode === 'play') {
+    h += '<div class="mic-area"><div id="mic-detected"><div class="mic-status">' + tr('micActive') + '</div></div>';
+    if (!S.micConnected) h += '<button class="mic-btn" onclick="startMicListening()" style="margin-top:8px">&#127908; ' + tr('tuningStartMic') + '</button>';
+    h += '</div>';
+    if (!S.micConnected && S.permissionHint) h += '<div class="warning">' + S.permissionHint + '</div>';
   }
 
   if (S.jazzCompleted) {
@@ -1465,18 +1590,38 @@ function renderJazz(app) {
 
   // Controls
   h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">';
-  h += '<button class="ref-btn" onclick="jazzPlayPhrase()">' + tr('playPhrase') + '</button>';
+  h += '<button class="ref-btn" onclick="' + (S.jazzPlaying ? 'jazzStopPhrase()' : 'jazzPlayPhrase()') + '">' + (S.jazzPlaying ? tr('stopPhrase') : tr('playPhrase')) + '</button>';
   h += '<button class="ref-btn" onclick="jazzReplayNote()">' + tr('replayNote') + '</button>';
   h += '</div>';
   h += '<div class="nav-row"><button class="nav-btn back" onclick="jazzStepBack()">' + tr('stepBack') + '</button><button class="nav-btn next" onclick="jazzStepFwd()">' + tr('stepFwd') + '</button></div>';
 
-  h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn back" onclick="backToLessons()">' + tr('backToLessons') + '</button>';
-  if (S.jazzMode === 'play') h += '<button class="nav-btn back" onclick="0">' + tr('listenFirst') + '</button>';
-  h += '</div>';
+  if (S.jazzCompleted && jazzHasNextLesson()) {
+    h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn next" onclick="jazzNextLesson()">' + tr('nextLesson') + '</button></div>';
+  }
+
+  h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn back" onclick="backToLessons()">' + tr('backToLessons') + '</button></div>';
 
   app.innerHTML = h;
 }
-function setJazzMode(m) { S.jazzMode = m; render(); }
+function setJazzMode(m) {
+  if (m === S.jazzMode) { render(); return; }
+  S.jazzMode = m;
+  clearJazzTimers();
+  S.jazzPlaying = false;
+  S.jazzMatchCount = 0;
+  S.jazzWaitRelease = false;
+  S.jazzReleaseCount = 0;
+  if (m === 'play') {
+    // Start a fresh play-through from the first note; the unlock itself persists.
+    S.jazzStep = 0;
+    S.jazzDoneStep = 0;
+    S.jazzCompleted = false;
+    startMicListening();
+  } else {
+    pauseListening();
+  }
+  render();
+}
 
 
 document.addEventListener('keydown', function(e){
