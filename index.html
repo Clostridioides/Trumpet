@@ -198,10 +198,10 @@ var MODES = {
 };
 
 var TOLERANCE = {
-  // Wieder tolerantere Tonerkennung: weniger stabile Frames und größere Cent-Fenster.
-  strict: {tuningStable:10, answerStable:7, tuningCents:18, answerCents:45},
-  normal: {tuningStable:8,  answerStable:5, tuningCents:24, answerCents:60},
-  relaxed:{tuningStable:6,  answerStable:3, tuningCents:30, answerCents:75}
+  // Mittlere Tonerkennung: nicht mehr über-permissiv, aber noch etwas verzeihender als ganz streng.
+  strict: {tuningStable:18, answerStable:14, tuningCents:12, answerCents:30},
+  normal: {tuningStable:14, answerStable:10, tuningCents:18, answerCents:42},
+  relaxed:{tuningStable:10, answerStable:7,  tuningCents:24, answerCents:55}
 };
 
 var ROOTS = [
@@ -443,7 +443,14 @@ var T = {
     backMenu: "← Menü",
     beginQuiz: "Quiz beginnen",
     setupTitle: "Einstimm-Phase",
-    setupHint: "Wähle zuerst Instrument, Kammerton und Referenzton. Spiele dann den Referenzton auf der Trompete und halte ihn etwas länger stabil, bis die Stimmung passt.",
+    setupHint: "Wähle zuerst Instrument, Kammerton und Referenzton. Spiele dann den Referenzton auf der Trompete und halte ihn stabil, bis die Stimmung passt.",
+    tuningTutorialTitle: "Stimm-Tutorial",
+    tuningTutorialStep1: "1. Wähle deine Trompete: B-Trompete, C-Trompete oder Es-Trompete.",
+    tuningTutorialStep2: "2. Wähle den Kammerton. Standard ist A = 442 Hz; im Orchester kann 440–444 Hz verlangt sein.",
+    tuningTutorialStep3: "3. Wähle einen bequemen Referenzton und höre ihn mit „Referenzton“ an.",
+    tuningTutorialStep4: "4. Starte das Mikrofon, spiele den notierten Referenzton ruhig und halte ihn ohne starkes Nachdrücken.",
+    tuningTutorialNeedle: "Anzeige: links = zu tief → Stimmzug etwas rein; rechts = zu hoch → Stimmzug etwas raus.",
+    tuningTutorialTip: "Erst den Ton stabil halten, dann den Stimmzug ändern. Nicht jeden kleinen Ausschlag mit dem Ansatz korrigieren.",
     playReference: "♪ Referenzton",
     tuningReady: "Eingestimmt. Du kannst jetzt das Quiz beginnen.",
     tuningTarget: "Ziel",
@@ -577,7 +584,14 @@ var T = {
     backMenu: "← Menu",
     beginQuiz: "Begin quiz",
     setupTitle: "Tuning phase",
-    setupHint: "First choose instrument, concert pitch and reference tone. Then play the reference tone on your trumpet and hold it a bit longer until the tuning is stable.",
+    setupHint: "First choose instrument, concert pitch and reference tone. Then play the reference tone on your trumpet and hold it steady until the tuning is stable.",
+    tuningTutorialTitle: "Tuning tutorial",
+    tuningTutorialStep1: "1. Choose your trumpet: B♭, C, or E♭ trumpet.",
+    tuningTutorialStep2: "2. Choose concert pitch. A = 442 Hz is the default; ensembles may ask for 440–444 Hz.",
+    tuningTutorialStep3: "3. Pick a comfortable reference note and listen to it with “Reference tone”.",
+    tuningTutorialStep4: "4. Start the microphone, play the written reference note calmly, and hold it without forcing the pitch.",
+    tuningTutorialNeedle: "Display: left = too low → push the tuning slide in slightly; right = too high → pull it out slightly.",
+    tuningTutorialTip: "First hold a stable tone, then adjust the tuning slide. Do not chase every small needle movement with your embouchure.",
     playReference: "♪ Reference tone",
     tuningReady: "Tuned. You can begin the quiz now.",
     tuningTarget: "Target",
@@ -1105,7 +1119,7 @@ function autoCorrelate(buf, sampleRate) {
   var SIZE = buf.length, rms = 0;
   for (var i=0;i<SIZE;i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.006) return -1;
+  if (rms < 0.01) return -1;
   // trim quiet edges
   var thresh = 0.2, r1 = 0, r2 = SIZE - 1;
   for (var a=0;a<SIZE/2;a++) if (Math.abs(buf[a]) < thresh) { r1 = a; break; }
@@ -1615,6 +1629,7 @@ function startTuner() { startMicListening(); }
 function renderTuner(app) {
   var h = '<h1>&#127930; ' + tr('tunerTitle') + '</h1>';
   h += '<div class="subtitle">' + tr('tunerHint') + '</div>';
+  h += renderTuningTutorial();
   h += '<div class="menu-section" style="padding:10px"><div class="small" style="text-align:center">' + tr('instrumentShort') + ': ' + TRANS[S.transposition]['label_'+S.lang] + ' · ' + tr('concertA') + ' = ' + S.concertA + ' Hz</div></div>';
   h += '<div class="mic-area"><div id="mic-detected"><div class="mic-status">' + tr('micActive') + '</div></div>';
   if (!S.micConnected) h += '<button class="mic-btn" onclick="startTuner()" style="margin-top:8px">&#127908; ' + tr('tuningStartMic') + '</button>';
@@ -1812,14 +1827,31 @@ function renderJazzLessonPicker() {
   h += '</div></div>';
   return h;
 }
+function renderTuningTutorial() {
+  var h = '<div class="menu-section"><h2>' + tr('tuningTutorialTitle') + '</h2>';
+  h += '<div class="meta" style="margin-top:0">';
+  ['tuningTutorialStep1','tuningTutorialStep2','tuningTutorialStep3','tuningTutorialStep4','tuningTutorialNeedle','tuningTutorialTip'].forEach(function(k){
+    h += '<div style="margin:6px 0">' + tr(k) + '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
 function renderSetup(app) {
   var tuning = getTuningNote();
   var h = '<h1>' + tr('setupTitle') + '</h1>';
   h += '<div class="subtitle">' + tr('setupHint') + '</div>';
+  h += renderTuningTutorial();
 
   h += '<div class="menu-section"><h2>' + tr('instrument') + '</h2><div class="opt-grid">';
   ['Bb','C','Eb'].forEach(function(t){
     h += '<div class="opt-btn' + (S.transposition===t?' selected':'') + '" onclick="selectTransposition(\''+t+'\')"><div class="opt-label">' + TRANS[t]['label_'+S.lang] + '</div><div class="opt-desc">' + TRANS[t]['desc_'+S.lang] + '</div></div>';
+  });
+  h += '</div></div>';
+
+  h += '<div class="menu-section"><h2>' + tr('concertA') + '</h2><div class="inline-grid">';
+  [440,442,443,444].forEach(function(v){
+    h += '<div class="opt-btn' + (S.concertA===v?' selected':'') + '" onclick="selectConcertA(' + v + ')"><div class="opt-label">A = ' + v + ' Hz</div></div>';
   });
   h += '</div></div>';
 
