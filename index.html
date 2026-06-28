@@ -198,9 +198,10 @@ var MODES = {
 };
 
 var TOLERANCE = {
-  strict: {tuningStable:18, answerStable:14, tuningCents:12, answerCents:30},
-  normal: {tuningStable:16, answerStable:12, tuningCents:18, answerCents:45},
-  relaxed:{tuningStable:12, answerStable:9,  tuningCents:24, answerCents:60}
+  // Wieder tolerantere Tonerkennung: weniger stabile Frames und größere Cent-Fenster.
+  strict: {tuningStable:10, answerStable:7, tuningCents:18, answerCents:45},
+  normal: {tuningStable:8,  answerStable:5, tuningCents:24, answerCents:60},
+  relaxed:{tuningStable:6,  answerStable:3, tuningCents:30, answerCents:75}
 };
 
 var ROOTS = [
@@ -405,9 +406,8 @@ function getJazzLesson(track, id) {
   return null;
 }
 function jazzLessonUnlocked(track, idx) {
-  if (idx === 0) return true;
-  var prev = JAZZ_TRACKS[track].lessons[idx-1];
-  return !!(S.jazzProgress && S.jazzProgress[prev.id]);
+  // Alle Lektionen/Level sind sofort frei wählbar.
+  return true;
 }
 
 var T = {
@@ -1105,7 +1105,7 @@ function autoCorrelate(buf, sampleRate) {
   var SIZE = buf.length, rms = 0;
   for (var i=0;i<SIZE;i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.01) return -1;
+  if (rms < 0.006) return -1;
   // trim quiet edges
   var thresh = 0.2, r1 = 0, r2 = SIZE - 1;
   for (var a=0;a<SIZE/2;a++) if (Math.abs(buf[a]) < thresh) { r1 = a; break; }
