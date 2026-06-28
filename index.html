@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Trompeten-Notenquiz</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d0d1a">
+<meta name="description" content="Noten lesen, spielen und Jazz-Phrasen lernen.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Trompete">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
 
 
@@ -123,6 +132,12 @@ var S = {
 
   autoAdvanceTimer: null,
   showSettings: false,
+  showStats: false,
+  adaptive: true,
+  metronome: true,
+
+  // long-term progress (note quiz + ear training)
+  stats: { perNote:{}, xp:0, totalSeen:0, totalCorrect:0, bestStreak:0, byDay:{}, lastPlayed:null },
 
   // ---- Jazz path ----
   jazzTrack: 'blues',
@@ -139,11 +154,13 @@ var S = {
   jazzWaitRelease: false,
   jazzReleaseCount: 0,
   jazzCompleted: false,
+  jazzOnTarget: false,
+  jazzTiming: null,
   jazzProgress: {}
 };
 
 // ---- Settings persistence ----
-var PERSIST_KEYS = ['lang','difficulty','mode','transposition','concertA','tuningTargetWrittenMidi','toleranceMode','autoAdvance','jazzProgress'];
+var PERSIST_KEYS = ['lang','difficulty','mode','transposition','concertA','tuningTargetWrittenMidi','toleranceMode','autoAdvance','adaptive','metronome','stats','jazzProgress'];
 function saveSettings() {
   try {
     var o = {};
@@ -324,6 +341,46 @@ var JAZZ_TRACKS = {
   }
 };
 
+// Scales track – major & minor scales, reusing the same lesson pipeline.
+// All notes are WRITTEN MIDI within the trumpet's written range (C4=60).
+JAZZ_TRACKS.scales = {
+  name_de:'Tonleitern', name_en:'Scales',
+  desc_de:'Dur- und Moll-Tonleitern sicher spielen – die Basis für alles.',
+  desc_en:'Play major and minor scales confidently – the basis for everything.',
+  lessons:[
+    { id:'sc1', level:1, tempo:72, swing:false,
+      name_de:'C-Dur aufwärts', name_en:'C major up',
+      desc_de:'Die C-Dur-Tonleiter Ton für Ton, mit Griff.',
+      desc_en:'The C major scale note by note, with fingering.',
+      notes:[60,62,64,65,67,69,71,72] },
+    { id:'sc2', level:1, tempo:72, swing:false,
+      name_de:'C-Dur abwärts', name_en:'C major down',
+      desc_de:'Dieselbe Tonleiter wieder hinunter.',
+      desc_en:'The same scale coming back down.',
+      notes:[72,71,69,67,65,64,62,60] },
+    { id:'sc3', level:2, tempo:80, swing:false,
+      name_de:'G-Dur', name_en:'G major',
+      desc_de:'Mit Fis – das erste Kreuz.',
+      desc_en:'With F♯ – the first sharp.',
+      notes:[67,69,71,72,74,76,78,79] },
+    { id:'sc4', level:2, tempo:80, swing:false,
+      name_de:'F-Dur', name_en:'F major',
+      desc_de:'Mit B – das erste Be.',
+      desc_en:'With B♭ – the first flat.',
+      notes:[65,67,69,70,72,74,76,77] },
+    { id:'sc5', level:3, tempo:84, swing:false,
+      name_de:'a-Moll', name_en:'A minor',
+      desc_de:'Natürlich Moll – die Bezugstonart zu C-Dur.',
+      desc_en:'Natural minor – the relative key of C major.',
+      notes:[69,71,72,74,76,77,79,81] },
+    { id:'sc6', level:3, tempo:84, swing:false,
+      name_de:'d-Moll', name_en:'D minor',
+      desc_de:'Noch eine wichtige Moll-Tonleiter.',
+      desc_en:'Another important minor scale.',
+      notes:[62,64,65,67,69,70,72,74] }
+  ]
+};
+
 function baseNoteByMidi(midi) {
   for (var i=0;i<BASE_NOTES.length;i++) if (BASE_NOTES[i].midi === midi) return BASE_NOTES[i];
   return null;
@@ -458,7 +515,35 @@ var T = {
     backToLessons: "← Lektionen",
     yourTurn: "Spiele diesen Ton:",
     listenFirst: "Hör zuerst zu, dann spiel nach.",
-    phraseOf: "von"
+    phraseOf: "von",
+    statistics: "Statistik",
+    levelLabel: "Level",
+    xpLabel: "XP",
+    accuracy: "Trefferquote",
+    bestStreak: "Beste Serie",
+    weakNotes: "Schwächste Töne",
+    noStatsYet: "Noch keine Daten – spiel ein paar Runden!",
+    resetStats: "Statistik zurücksetzen",
+    adaptive: "Adaptiv üben",
+    adaptiveDesc: "Schwierige Töne häufiger abfragen.",
+    metronome: "Metronom",
+    metronomeDesc: "Klick mit Einzähler im Nachspiel-Modus.",
+    countIn: "Einzähler ▸",
+    timing: "Timing",
+    timingEarly: "früh",
+    timingLate: "spät",
+    timingOnBeat: "genau",
+    onTarget: "Ton erkannt ✓",
+    tunerCard: "Stimmgerät",
+    tunerCardDesc: "Töne live anzeigen und Trompete stimmen.",
+    tunerTitle: "Stimmgerät",
+    tunerHint: "Spiele einen Ton – die App zeigt Note und Abweichung in Cent.",
+    earCard: "Gehörbildung",
+    earCardDesc: "Ton hören und den richtigen Notennamen erkennen.",
+    listenPrompt: "Welche Note hörst du?",
+    listenNote: "▶ Ton anhören",
+    playAgain: "▶ Nochmal hören",
+    octave: "Okt."
   },
   en: {
     title: "Trumpet Note Quiz",
@@ -564,14 +649,42 @@ var T = {
     backToLessons: "← Lessons",
     yourTurn: "Play this note:",
     listenFirst: "Listen first, then play it back.",
-    phraseOf: "of"
+    phraseOf: "of",
+    statistics: "Statistics",
+    levelLabel: "Level",
+    xpLabel: "XP",
+    accuracy: "Accuracy",
+    bestStreak: "Best streak",
+    weakNotes: "Weakest notes",
+    noStatsYet: "No data yet – play a few rounds!",
+    resetStats: "Reset statistics",
+    adaptive: "Adaptive practice",
+    adaptiveDesc: "Ask harder notes more often.",
+    metronome: "Metronome",
+    metronomeDesc: "Click with count-in in play-back mode.",
+    countIn: "Count-in ▸",
+    timing: "Timing",
+    timingEarly: "early",
+    timingLate: "late",
+    timingOnBeat: "on beat",
+    onTarget: "Note detected ✓",
+    tunerCard: "Tuner",
+    tunerCardDesc: "Show notes live and tune your trumpet.",
+    tunerTitle: "Tuner",
+    tunerHint: "Play a tone – the app shows the note and deviation in cents.",
+    earCard: "Ear training",
+    earCardDesc: "Hear a tone and identify the correct note name.",
+    listenPrompt: "Which note do you hear?",
+    listenNote: "▶ Listen to the tone",
+    playAgain: "▶ Play again",
+    octave: "Oct."
   }
 };
 
 function tr(key) { return (T[S.lang] && T[S.lang][key]) || key; }
 
 function tol() { return TOLERANCE[S.toleranceMode] || TOLERANCE.normal; }
-function needsMicInQuiz() { return S.mode === 'mic' || S.mode === 'both'; }
+function needsMicInQuiz() { return S.quizType !== 'ear' && (S.mode === 'mic' || S.mode === 'both'); }
 
 function getRootById(id) {
   for (var i=0;i<ROOTS.length;i++) if (ROOTS[i].id === id) return ROOTS[i];
@@ -682,6 +795,13 @@ function unlockAudio() {
 }
 document.addEventListener('touchstart', unlockAudio, {once:true});
 document.addEventListener('click', unlockAudio, {once:true});
+function resumeContexts() {
+  try { if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); } catch(e) {}
+  try { if (micCtx && micCtx.state === 'suspended') micCtx.resume(); } catch(e) {}
+}
+document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') resumeContexts(); });
+document.addEventListener('pointerdown', resumeContexts);
+window.addEventListener('focus', resumeContexts);
 
 function midiToFreq(midi) { return S.concertA * Math.pow(2, (midi - 69) / 12); }
 function noteWithSoundingData(n) {
@@ -705,10 +825,62 @@ function getTuningNote() {
   return noteWithSoundingData(BASE_NOTES[7]);
 }
 function getCurrentPromptNote() { return S.currentNote; }
+var lastPickedMidi = -1;
 function pickRandomSingleNote() {
   var notes = getActiveSingleNotes();
-  return notes[Math.floor(Math.random() * notes.length)];
+  if (!notes.length) return null;
+  if (!S.adaptive || notes.length < 3) {
+    return notes[Math.floor(Math.random() * notes.length)];
+  }
+  var pn = (S.stats && S.stats.perNote) || {};
+  var weights = [], total = 0;
+  for (var i=0;i<notes.length;i++) {
+    var e = pn[notes[i].name], w;
+    if (!e || !e.seen) w = 2.2;                       // unseen → practice more
+    else { var pct = e.correct / e.seen; w = 0.5 + 1.8 * (1 - pct); } // worse → heavier
+    if (notes[i].midi === lastPickedMidi) w *= 0.25;  // avoid immediate repeat
+    if (w < 0.05) w = 0.05;
+    weights.push(w); total += w;
+  }
+  var r = Math.random() * total, acc = 0, chosen = notes[notes.length - 1];
+  for (var j=0;j<notes.length;j++) { acc += weights[j]; if (r <= acc) { chosen = notes[j]; break; } }
+  lastPickedMidi = chosen.midi;
+  return chosen;
 }
+function ensureStats() {
+  if (!S.stats) S.stats = { perNote:{}, xp:0, totalSeen:0, totalCorrect:0, bestStreak:0, byDay:{}, lastPlayed:null };
+  if (!S.stats.perNote) S.stats.perNote = {};
+  if (!S.stats.byDay) S.stats.byDay = {};
+  return S.stats;
+}
+function recordAnswer(note, correct) {
+  if (!note) return;
+  var st = ensureStats();
+  var e = st.perNote[note.name] || { seen:0, correct:0 };
+  e.seen++; if (correct) e.correct++;
+  st.perNote[note.name] = e;
+  st.totalSeen = (st.totalSeen||0) + 1;
+  if (correct) st.totalCorrect = (st.totalCorrect||0) + 1;
+  st.xp = (st.xp||0) + (correct ? (10 + Math.min(10, S.streak)) : 2);
+  if (S.streak > (st.bestStreak||0)) st.bestStreak = S.streak;
+  var day = new Date().toISOString().slice(0,10);
+  st.byDay[day] = (st.byDay[day]||0) + 1;
+  st.lastPlayed = day;
+  saveSettings();
+}
+function statLevel() { return Math.floor(Math.sqrt((ensureStats().xp||0) / 40)) + 1; }
+function weakestNotes(n) {
+  var pn = ensureStats().perNote, arr = [];
+  Object.keys(pn).forEach(function(k){
+    var e = pn[k];
+    if (e.seen >= 3) arr.push({ name:k, pct:Math.round(e.correct/e.seen*100), seen:e.seen });
+  });
+  arr.sort(function(a,b){ return a.pct - b.pct; });
+  return arr.slice(0, n);
+}
+function resetStats() { S.stats = { perNote:{}, xp:0, totalSeen:0, totalCorrect:0, bestStreak:0, byDay:{}, lastPlayed:null }; saveSettings(); render(); }
+function toggleStats() { S.showStats = !S.showStats; render(); }
+function toggleAdaptive() { S.adaptive = !S.adaptive; saveSettings(); render(); }
 
 function playTone(freq, dur) {
   var ctx = ensureAudioCtx(), t = ctx.currentTime;
@@ -766,6 +938,41 @@ function playScale(notes, opts) {
     if (opts.swing) thisGap = (i % 2 === 0) ? gap * 1.34 : gap * 0.66;
     t += thisGap;
   });
+}
+
+// ---- Metronome / count-in (used by jazz play-along) ----
+function playClick(accent) {
+  var ctx; try { ctx = ensureAudioCtx(); } catch(e) { return; }
+  var t = ctx.currentTime;
+  var osc = ctx.createOscillator(), g = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.value = accent ? 2000 : 1400;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(accent ? 0.18 : 0.11, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  osc.connect(g); g.connect(ctx.destination); osc.start(t); osc.stop(t + 0.06);
+}
+var metroTimer = null, metroBeatIndex = 0, metroLastClickAt = 0, metroBeatMs = 500;
+function jazzBeatMs() { return Math.round(60000 / (S.jazzTempo || 80)); }
+function startMetronome() {
+  stopMetronome();
+  metroBeatMs = jazzBeatMs(); metroBeatIndex = 0;
+  function tick() { playClick(metroBeatIndex % 4 === 0); metroLastClickAt = Date.now(); metroBeatIndex++; }
+  tick();
+  metroTimer = setInterval(tick, metroBeatMs);
+}
+function stopMetronome() { if (metroTimer) { clearInterval(metroTimer); metroTimer = null; } }
+function toggleMetronome() {
+  S.metronome = !S.metronome; saveSettings();
+  if (!S.metronome) stopMetronome();
+  else if (S.screen === 'jazz' && S.jazzMode === 'play' && S.micListening) startMetronome();
+  render();
+}
+
+function chromaticSpell(midi) {
+  var pc = ((midi % 12) + 12) % 12;
+  var de = ['C','Cis','D','Es','E','F','Fis','G','As','A','B','H'][pc];
+  return { name: de, octave: Math.floor(midi / 12) - 1 };
 }
 
 function buildStaffSVG(note, feedbackColor) {
@@ -895,23 +1102,35 @@ function findWrittenNoteBySoundingMidi(midi) {
   return null;
 }
 function autoCorrelate(buf, sampleRate) {
-  var size = buf.length, rms = 0;
-  for (var i=0;i<size;i++) rms += buf[i] * buf[i];
-  rms = Math.sqrt(rms / size);
+  var SIZE = buf.length, rms = 0;
+  for (var i=0;i<SIZE;i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / SIZE);
   if (rms < 0.01) return -1;
-  var r1=0, r2=size-1, thresh=0.2;
-  for (var a=0;a<size/2;a++) if (Math.abs(buf[a]) < thresh) { r1=a; break; }
-  for (var b=1;b<size/2;b++) if (Math.abs(buf[size-b]) < thresh) { r2=size-b; break; }
-  var trimmed = buf.slice(r1, r2); size = trimmed.length;
-  if (size < 64) return -1;
-  var c = new Float32Array(size);
-  for (var i2=0;i2<size;i2++) for (var j=0;j<size-i2;j++) c[i2] += trimmed[j] * trimmed[j+i2];
-  var d=0;
-  while (c[d] > c[d+1]) { d++; if (d >= size - 1) return -1; }
-  var maxVal=-1, maxPos=-1;
-  for (var i3=d;i3<size;i3++) if (c[i3] > maxVal) { maxVal = c[i3]; maxPos = i3; }
+  // trim quiet edges
+  var thresh = 0.2, r1 = 0, r2 = SIZE - 1;
+  for (var a=0;a<SIZE/2;a++) if (Math.abs(buf[a]) < thresh) { r1 = a; break; }
+  for (var b=1;b<SIZE/2;b++) if (Math.abs(buf[SIZE-b]) < thresh) { r2 = SIZE - b; break; }
+  var trimmed = buf.subarray(r1, r2);
+  var n = trimmed.length;
+  if (n < 128) return -1;
+  if (n > 2048) n = 2048;                 // cap window so cost stays bounded on mobile
+  // Only search lags inside the pitch range we actually care about (~70–1400 Hz).
+  var minLag = Math.max(2, Math.floor(sampleRate / 1400));
+  var maxLag = Math.min(n - 1, Math.ceil(sampleRate / 70));
+  var c = new Float32Array(maxLag + 1);
+  for (var lag=0; lag<=maxLag; lag++) {
+    var sum = 0;
+    for (var k=0;k<n-lag;k++) sum += trimmed[k] * trimmed[k+lag];
+    c[lag] = sum;
+  }
+  // walk past the zero-lag peak, then take the strongest peak in range
+  var d = 0; while (d < maxLag && c[d] > c[d+1]) d++;
+  var start = Math.max(d, minLag);
+  var maxVal = -Infinity, maxPos = -1;
+  for (var l=start;l<=maxLag;l++) if (c[l] > maxVal) { maxVal = c[l]; maxPos = l; }
+  if (maxPos <= 0) return -1;
   var T0 = maxPos;
-  if (T0 > 0 && T0 < size - 1) {
+  if (T0 > 0 && T0 < maxLag) {
     var x1=c[T0-1], x2=c[T0], x3=c[T0+1], aa=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
     if (aa) T0 = T0 - bb / (2 * aa);
   }
@@ -987,6 +1206,18 @@ function detectPitch() {
     if (jazzDetect(freq)) { micRafId = requestAnimationFrame(detectPitch); return; }
   }
 
+  if (S.screen === 'tuner') {
+    var sMidi = midiToRounded(freq);          // nearest sounding (concert) pitch
+    var spell = chromaticSpell(sMidi);
+    S.micDetectedName = spell.name;
+    S.micDetectedWritten = '';
+    S.micDetectedCents = centsOff(freq, sMidi);
+    var writtenSpell = chromaticSpell(sMidi - TRANS[S.transposition].semitones);
+    renderMicDisplay(tr('written') + ': ' + localizedNoteName(writtenSpell.name) + ' · ' + tr('octave') + ' ' + spell.octave);
+    micRafId = requestAnimationFrame(detectPitch);
+    return;
+  }
+
   var midi = midiToRounded(freq);
   var mapped = findWrittenNoteBySoundingMidi(midi);
 
@@ -1030,6 +1261,7 @@ function checkBothDone() {
     var ok = S.clickCorrect && S.micCorrect;
     if (ok) S.streak++; else S.streak = 0;
     S.totalCount++; if (ok) S.correctCount++;
+    recordAnswer(S.currentNote, ok);
     render();
     scheduleAutoAdvance(ok);
   }
@@ -1050,6 +1282,7 @@ function openLesson(id) {
   clearAutoAdvance();
   pauseListening();
   clearJazzTimers();
+  stopMetronome();
   S.jazzLessonId = id;
   S.jazzPhrase = buildJazzPhrase(ls);
   S.jazzStep = 0;
@@ -1062,6 +1295,8 @@ function openLesson(id) {
   S.jazzMatchCount = 0;
   S.jazzWaitRelease = false;
   S.jazzReleaseCount = 0;
+  S.jazzTiming = null;
+  S.jazzOnTarget = false;
   S.screen = 'jazz';
   render();
 }
@@ -1122,6 +1357,7 @@ function jazzPlayPhrase() {
 function completeJazzLesson() {
   if (!S.jazzLessonId) return;
   clearJazzTimers();
+  stopMetronome();
   S.jazzPlaying = false;
   S.jazzCompleted = true;
   S.jazzDoneStep = S.jazzPhrase.length;
@@ -1147,10 +1383,20 @@ function jazzNextLesson() {
 // Called from detectPitch() while on the jazz screen. Returns true when it has
 // handled the frame (Play mode), false to let normal detection continue.
 function jazzAdvanceAfterMatch() {
+  // Timing feedback relative to the metronome, if it's running.
+  if (metroTimer) {
+    var bm = metroBeatMs || jazzBeatMs();
+    var off = (Date.now() - metroLastClickAt) % bm;
+    if (off > bm / 2) off -= bm;
+    var lbl = Math.abs(off) <= 60 ? 'onbeat' : (off < 0 ? 'early' : 'late');
+    S.jazzTiming = { ms: Math.round(off), label: lbl };
+  }
   S.jazzMatchCount = 0;
+  S.jazzOnTarget = false;
   S.jazzDoneStep = Math.max(S.jazzDoneStep, S.jazzStep + 1);
   if (S.jazzStep >= S.jazzPhrase.length - 1) {
     S.jazzWaitRelease = false;
+    stopMetronome();
     pauseListening();
     completeJazzLesson();
     return;
@@ -1173,13 +1419,15 @@ function jazzDetect(freq) {
   // Gate stays closed until the player releases (silence), so a single sustained
   // tone or a repeated pitch can't roll through several notes at once.
   if (S.jazzWaitRelease) {
+    S.jazzOnTarget = false;
     renderMicDisplay(tr('yourTurn'), 0, tol().answerStable);
     return true;
   }
   var onTarget = (midi === cur.soundingMidi) && (Math.abs(S.micDetectedCents) <= tol().answerCents);
+  S.jazzOnTarget = onTarget;
   if (onTarget) {
     S.jazzMatchCount++;
-    renderMicDisplay(tr('yourTurn'), S.jazzMatchCount, tol().answerStable);
+    renderMicDisplay(tr('onTarget'), S.jazzMatchCount, tol().answerStable);
     if (S.jazzMatchCount >= tol().answerStable) jazzAdvanceAfterMatch();
   } else {
     S.jazzMatchCount = 0;
@@ -1190,15 +1438,34 @@ function jazzDetect(freq) {
 function jazzOnNoPitch() {
   if (S.jazzMode !== 'play') return;
   S.jazzMatchCount = 0;
+  S.jazzOnTarget = false;
   if (S.jazzWaitRelease) {
     S.jazzReleaseCount++;
     if (S.jazzReleaseCount >= 3) { S.jazzWaitRelease = false; S.jazzReleaseCount = 0; }
   }
 }
+function jazzCountIn() {
+  clearJazzTimers(); stopMetronome();
+  S.jazzStep = 0; S.jazzDoneStep = 0; S.jazzCompleted = false;
+  S.jazzMatchCount = 0; S.jazzWaitRelease = false; S.jazzReleaseCount = 0;
+  S.jazzTiming = null; S.jazzOnTarget = false;
+  var bm = jazzBeatMs();
+  for (var i=0;i<4;i++) (function(idx){
+    jazzPlayTimers.push(setTimeout(function(){ playClick(idx === 0); }, idx * bm));
+  })(i);
+  jazzPlayTimers.push(setTimeout(function(){
+    if (S.screen !== 'jazz' || S.jazzMode !== 'play') return;
+    startMicListening();
+    if (S.metronome) startMetronome();
+    render();
+  }, 4 * bm));
+  render();
+}
 function backToLessons() {
   clearAutoAdvance();
   pauseListening();
   clearJazzTimers();
+  stopMetronome();
   S.screen = 'menu';
   S.quizType = 'jazz';
   render();
@@ -1271,18 +1538,20 @@ function nextTask() {
   S.stableCount = 0;
   S.lastMidi = -1;
   render();
-  if (needsMicInQuiz()) startMicListening();
+  if (S.quizType === 'ear') setTimeout(playRef, 280);
+  else if (needsMicInQuiz()) startMicListening();
 }
 function answerClick(name) {
   if (S.clickAnswer !== null) return;
   S.clickAnswer = name;
   var promptNote = getCurrentPromptNote();
   S.clickCorrect = (promptNote && name === promptNote.name);
-  if (S.mode === 'click') {
+  if (S.mode === 'click' || S.quizType === 'ear') {
     S.answered = true;
     if (S.clickCorrect) S.streak++; else S.streak = 0;
     S.totalCount++;
     if (S.clickCorrect) S.correctCount++;
+    recordAnswer(promptNote, S.clickCorrect);
     render();
     scheduleAutoAdvance(S.clickCorrect);
   } else {
@@ -1313,7 +1582,7 @@ function buildFingeringSVG(note) {
   svg += '<text x="'+(w/2)+'" y="'+(h-4)+'" text-anchor="middle" font-size="12" font-family="Georgia,serif" fill="#aaa">'+(pressed.length===0?tr('open'):tr('valve')+' '+pressed.join(' + '))+'</text></svg>';
   return svg;
 }
-function goMenu() { clearAutoAdvance(); pauseListening(); S.screen = 'menu'; render(); }
+function goMenu() { clearAutoAdvance(); pauseListening(); clearJazzTimers(); stopMetronome(); S.screen = 'menu'; render(); }
 function startMic() { startMicListening(); }
 function disconnectMicPersistent() { disconnectMic(); render(); }
 function handleMicOnlyAnswer() {
@@ -1322,6 +1591,7 @@ function handleMicOnlyAnswer() {
     if (S.micCorrect) S.streak++; else S.streak = 0;
     S.totalCount++;
     if (S.micCorrect) S.correctCount++;
+    recordAnswer(S.currentNote, S.micCorrect);
     render();
     scheduleAutoAdvance(S.micCorrect);
   }
@@ -1332,7 +1602,82 @@ function render() {
   if (S.screen === 'menu') renderMenu(app);
   else if (S.screen === 'setup') renderSetup(app);
   else if (S.screen === 'jazz') renderJazz(app);
+  else if (S.screen === 'tuner') renderTuner(app);
   else renderQuiz(app);
+}
+function goTuner() {
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); stopMetronome();
+  S.screen = 'tuner';
+  render();
+  startTuner();
+}
+function startTuner() { startMicListening(); }
+function renderTuner(app) {
+  var h = '<h1>&#127930; ' + tr('tunerTitle') + '</h1>';
+  h += '<div class="subtitle">' + tr('tunerHint') + '</div>';
+  h += '<div class="menu-section" style="padding:10px"><div class="small" style="text-align:center">' + tr('instrumentShort') + ': ' + TRANS[S.transposition]['label_'+S.lang] + ' · ' + tr('concertA') + ' = ' + S.concertA + ' Hz</div></div>';
+  h += '<div class="mic-area"><div id="mic-detected"><div class="mic-status">' + tr('micActive') + '</div></div>';
+  if (!S.micConnected) h += '<button class="mic-btn" onclick="startTuner()" style="margin-top:8px">&#127908; ' + tr('tuningStartMic') + '</button>';
+  h += '</div>';
+  if (!S.micConnected && S.permissionHint) h += '<div class="warning">' + S.permissionHint + '</div>';
+  h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn back" onclick="goMenu()">' + tr('backMenu') + '</button></div>';
+  app.innerHTML = h;
+  renderMicDisplay(tr('micActive'));
+}
+function startEar() { S.quizType = 'ear'; beginQuiz(); }
+function renderEarQuiz(app) {
+  var promptNote = getCurrentPromptNote();
+  var pct = S.totalCount > 0 ? Math.round(S.correctCount / S.totalCount * 100) : 0;
+  var h = '';
+  h += '<div class="score-bar"><span>' + tr('levelLabel') + ' ' + statLevel() + ' · ' + tr('round') + ' ' + S.round + '</span><span class="score-streak">' + (S.streak > 0 ? '&#128293; ' + S.streak : '') + '</span><span class="score-pct">' + S.correctCount + '/' + S.totalCount + (S.totalCount > 0 ? ' (' + pct + '%)' : '') + '</span></div>';
+  if (S.answered) {
+    h += buildStaffSVG(promptNote, S.clickCorrect ? '#22c55e' : '#ef4444');
+  } else {
+    h += '<div class="menu-section" style="text-align:center;padding:26px"><div style="font-size:2.6em">&#127911;</div><div class="combo-status">' + tr('listenPrompt') + '</div></div>';
+  }
+  h += '<div style="text-align:center"><button class="ref-btn" onclick="playRef()">' + (S.answered ? tr('playAgain') : tr('listenNote')) + '</button></div>';
+  h += '<div class="note-btns">';
+  getUniqueNames().forEach(function(n){
+    var cls = 'note-btn', dis = '';
+    if (S.clickAnswer !== null) {
+      dis = ' disabled';
+      if (n === promptNote.name) cls += ' correct';
+      else if (n === S.clickAnswer && !S.clickCorrect) cls += ' wrong';
+      else cls += ' dimmed';
+    }
+    h += '<button class="' + cls + '"' + dis + ' onclick="answerClick(\'' + n + '\')">' + localizedNoteName(n) + '</button>';
+  });
+  h += '</div>';
+  if (S.answered) {
+    var fingLabel = (promptNote.fing || []).length === 0 ? tr('open') : tr('valve') + ' ' + promptNote.fing.join('+');
+    h += '<div class="feedback ' + (S.clickCorrect ? 'correct' : 'wrong') + '">' + (S.clickCorrect ? '&#10003; ' + tr('correct') + ' ' : '&#10007; ' + tr('wrong') + ' ') + noteLabel(promptNote) + ' (' + noteDisplayLabel(promptNote) + ') · ' + fingLabel + '</div>';
+    var nextLabel = (S.autoAdvance && S.autoAdvanceTimer) ? tr('autoNext') : tr('next');
+    h += '<div class="nav-row"><button class="nav-btn back" onclick="goMenu()">' + tr('menu') + '</button><button class="nav-btn next" onclick="nextTask()">' + nextLabel + '</button></div>';
+  }
+  app.innerHTML = h;
+}
+function renderStatsPanel() {
+  var st = ensureStats();
+  var acc = st.totalSeen > 0 ? Math.round(st.totalCorrect / st.totalSeen * 100) : 0;
+  var h = '<div class="menu-section"><h2 onclick="toggleStats()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+        + tr('statistics') + '<span style="font-size:0.8em;color:#aaa">' + (S.showStats ? '&#9650;' : '&#9660;') + '</span></h2>';
+  if (S.showStats) {
+    if (!st.totalSeen) {
+      h += '<div class="opt-desc">' + tr('noStatsYet') + '</div>';
+    } else {
+      h += '<div style="display:flex;justify-content:space-around;text-align:center;margin:6px 0">';
+      h += '<div><div style="font-size:1.4em;color:#f0c040;font-weight:bold">' + statLevel() + '</div><div class="small">' + tr('levelLabel') + '</div></div>';
+      h += '<div><div style="font-size:1.4em;color:#f0c040;font-weight:bold">' + (st.xp||0) + '</div><div class="small">' + tr('xpLabel') + '</div></div>';
+      h += '<div><div style="font-size:1.4em;color:#f0c040;font-weight:bold">' + acc + '%</div><div class="small">' + tr('accuracy') + '</div></div>';
+      h += '<div><div style="font-size:1.4em;color:#f0c040;font-weight:bold">' + (st.bestStreak||0) + '</div><div class="small">' + tr('bestStreak') + '</div></div>';
+      h += '</div>';
+      var weak = weakestNotes(3);
+      if (weak.length) h += '<div class="small" style="margin-top:6px"><strong>' + tr('weakNotes') + ':</strong> ' + weak.map(function(w){ return localizedNoteName(w.name) + ' (' + w.pct + '%)'; }).join(' · ') + '</div>';
+      h += '<div style="text-align:center;margin-top:8px"><button class="ref-btn" onclick="resetStats()">' + tr('resetStats') + '</button></div>';
+    }
+  }
+  h += '</div>';
+  return h;
 }
 function renderToggle(labelKey, descKey, isOn, onClickFn) {
   var h = '<div class="opt-btn" onclick="'+onClickFn+'" style="display:flex;justify-content:space-between;align-items:center">';
@@ -1350,7 +1695,11 @@ function renderSettingsPanel() {
   h += '<h2 onclick="toggleSettings()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
      + tr('settings') + '<span style="font-size:0.8em;color:#aaa">' + (S.showSettings ? '&#9650;' : '&#9660;') + '</span></h2>';
   if (S.showSettings) {
-    h += '<div class="opt-grid" style="margin-bottom:10px">' + renderToggle('autoAdvance','autoAdvanceDesc',S.autoAdvance,'toggleAutoAdvance()') + '</div>';
+    h += '<div class="opt-grid" style="margin-bottom:10px">'
+       + renderToggle('autoAdvance','autoAdvanceDesc',S.autoAdvance,'toggleAutoAdvance()')
+       + renderToggle('adaptive','adaptiveDesc',S.adaptive,'toggleAdaptive()')
+       + renderToggle('metronome','metronomeDesc',S.metronome,'toggleMetronome()')
+       + '</div>';
 
     h += '<h2 style="font-size:0.95em">' + tr('language') + '</h2><div class="inline-grid" style="margin-bottom:10px">';
     h += '<div class="opt-btn' + (S.lang==='de'?' selected':'') + '" onclick="selectLanguage(\'de\')"><div class="opt-label">' + tr('german') + '</div></div>';
@@ -1382,15 +1731,30 @@ function renderMenu(app) {
   var h = '<h1>&#127930; ' + tr('title') + '</h1>';
   h += '<div class="subtitle">' + tr('subtitle') + '</div>';
 
-  // Practice mode: note quiz vs jazz path
+  // Practice mode: note quiz / ear training / jazz / tuner
   h += '<div class="menu-section"><h2>' + tr('practiceMode') + '</h2><div class="opt-grid">';
   h += '<div class="opt-btn' + (S.quizType==='single'?' selected':'') + '" onclick="selectQuizType(\'single\')"><div class="opt-label">&#127925; ' + tr('noteQuizCard') + '</div><div class="opt-desc">' + tr('noteQuizCardDesc') + '</div></div>';
+  h += '<div class="opt-btn' + (S.quizType==='ear'?' selected':'') + '" onclick="selectQuizType(\'ear\')"><div class="opt-label">&#127911; ' + tr('earCard') + '</div><div class="opt-desc">' + tr('earCardDesc') + '</div></div>';
   h += '<div class="opt-btn' + (S.quizType==='jazz'?' selected':'') + '" onclick="selectQuizType(\'jazz\')"><div class="opt-label">&#127927; ' + tr('jazzCard') + '</div><div class="opt-desc">' + tr('jazzCardDesc') + '</div></div>';
+  h += '<div class="opt-btn" onclick="goTuner()"><div class="opt-label">&#9201; ' + tr('tunerCard') + '</div><div class="opt-desc">' + tr('tunerCardDesc') + '</div></div>';
   h += '</div></div>';
 
   if (S.quizType === 'jazz') {
     h += renderJazzLessonPicker();
     h += renderSettingsPanel();
+    app.innerHTML = h;
+    return;
+  }
+
+  if (S.quizType === 'ear') {
+    h += '<div class="menu-section"><h2>' + tr('difficulty') + '</h2><div class="opt-grid">';
+    ['veryeasy','easy','medium','hard','expert'].forEach(function(d){
+      h += '<div class="opt-btn' + (S.difficulty===d?' selected':'') + '" onclick="selectDifficulty(\''+d+'\')"><div class="opt-label">' + DIFF[d]['label_'+S.lang] + '</div><div class="opt-desc">' + DIFF[d]['desc_'+S.lang] + '</div></div>';
+    });
+    h += '</div></div>';
+    h += renderStatsPanel();
+    h += renderSettingsPanel();
+    h += '<button class="start-btn" onclick="startEar()">' + tr('startNow') + '</button>';
     app.innerHTML = h;
     return;
   }
@@ -1407,6 +1771,7 @@ function renderMenu(app) {
   });
   h += '</div></div>';
 
+  h += renderStatsPanel();
   h += renderSettingsPanel();
 
   // Smart start: click-only needs no tuning, so go straight in.
@@ -1483,10 +1848,11 @@ function renderSetup(app) {
   renderMicDisplay(S.setupTuned ? tr('tuningReady') : tr('tuningWaiting'), S.tuningStableCount, tol().tuningStable);
 }
 function renderQuiz(app) {
+  if (S.quizType === 'ear') { renderEarQuiz(app); return; }
   var promptNote = getCurrentPromptNote();
   var pct = S.totalCount > 0 ? Math.round(S.correctCount / S.totalCount * 100) : 0;
   var h = '';
-  h += '<div class="score-bar"><span>' + tr('round') + ' ' + S.round + '</span><span class="score-streak">' + (S.streak > 0 ? '&#128293; ' + S.streak : '') + '</span><span class="score-pct">' + S.correctCount + '/' + S.totalCount + (S.totalCount > 0 ? ' (' + pct + '%)' : '') + '</span></div>';
+  h += '<div class="score-bar"><span>' + tr('levelLabel') + ' ' + statLevel() + ' · ' + tr('round') + ' ' + S.round + '</span><span class="score-streak">' + (S.streak > 0 ? '&#128293; ' + S.streak : '') + '</span><span class="score-pct">' + S.correctCount + '/' + S.totalCount + (S.totalCount > 0 ? ' (' + pct + '%)' : '') + '</span></div>';
 
   var fbColor = null;
   if (S.answered) {
@@ -1571,8 +1937,9 @@ function renderJazz(app) {
 
   // Current note detail + fingering
   if (cur) {
+    var onT = (S.jazzMode === 'play' && S.jazzOnTarget);
     var curLabel = (S.jazzMode === 'play') ? tr('yourTurn') : (tr('currentTone') + ':');
-    h += '<div class="combo-status">' + curLabel + ' <strong>' + noteLabel(cur) + '</strong> (' + noteDisplayLabel(cur) + ')</div>';
+    h += '<div class="combo-status"' + (onT ? ' style="color:#22c55e"' : '') + '>' + curLabel + ' <strong>' + noteLabel(cur) + '</strong> (' + noteDisplayLabel(cur) + ')' + (onT ? ' &#10003;' : '') + '</div>';
     h += '<div style="text-align:center;margin:4px 0">' + buildFingeringSVG(cur) + '</div>';
   }
 
@@ -1582,6 +1949,17 @@ function renderJazz(app) {
     if (!S.micConnected) h += '<button class="mic-btn" onclick="startMicListening()" style="margin-top:8px">&#127908; ' + tr('tuningStartMic') + '</button>';
     h += '</div>';
     if (!S.micConnected && S.permissionHint) h += '<div class="warning">' + S.permissionHint + '</div>';
+
+    // Count-in + metronome controls
+    h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">';
+    h += '<button class="ref-btn" onclick="jazzCountIn()">' + tr('countIn') + '</button>';
+    h += '<button class="ref-btn" onclick="toggleMetronome()" style="' + (S.metronome ? 'background:rgba(240,192,64,0.25);border-color:#f0c040' : '') + '">&#9201; ' + tr('metronome') + ': ' + (S.metronome ? tr('on') : tr('off')) + '</button>';
+    h += '</div>';
+    if (S.jazzTiming) {
+      var tcol = S.jazzTiming.label === 'onbeat' ? '#22c55e' : '#f0c040';
+      var tlbl = S.jazzTiming.label === 'onbeat' ? tr('timingOnBeat') : (S.jazzTiming.label === 'early' ? tr('timingEarly') : tr('timingLate'));
+      h += '<div class="combo-status" style="color:' + tcol + '">' + tr('timing') + ': ' + tlbl + ' (' + (S.jazzTiming.ms > 0 ? '+' : '') + S.jazzTiming.ms + ' ms)</div>';
+    }
   }
 
   if (S.jazzCompleted) {
@@ -1607,10 +1985,13 @@ function setJazzMode(m) {
   if (m === S.jazzMode) { render(); return; }
   S.jazzMode = m;
   clearJazzTimers();
+  stopMetronome();
   S.jazzPlaying = false;
   S.jazzMatchCount = 0;
   S.jazzWaitRelease = false;
   S.jazzReleaseCount = 0;
+  S.jazzTiming = null;
+  S.jazzOnTarget = false;
   if (m === 'play') {
     // Start a fresh play-through from the first note; the unlock itself persists.
     S.jazzStep = 0;
@@ -1633,7 +2014,7 @@ document.addEventListener('keydown', function(e){
       else playRef();
       return;
     }
-    if ((S.mode === 'click' || S.mode === 'both') && !S.answered && /^[1-9]$/.test(e.key)) {
+    if ((S.mode === 'click' || S.mode === 'both' || S.quizType === 'ear') && !S.answered && /^[1-9]$/.test(e.key)) {
       var names = getUniqueNames();
       var idx = parseInt(e.key, 10) - 1;
       if (idx < names.length) { answerClick(names[idx]); }
@@ -1646,6 +2027,12 @@ document.addEventListener('keydown', function(e){
 loadSettings();
 render();
 window.addEventListener('beforeunload', function(){ disconnectMic(); });
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
 
 </script>
 </body>
