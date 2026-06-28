@@ -1078,6 +1078,7 @@ function pauseListening() {
 }
 function ensureMic() {
   if (micStream && micCtx && micAnalyser) {
+    if (micCtx.state === 'suspended') micCtx.resume();   // reused after tuning: wake it up
     S.micConnected = true;
     S.permissionHint = tr('firstPermission');
     return Promise.resolve();
@@ -1116,35 +1117,23 @@ function findWrittenNoteBySoundingMidi(midi) {
   return null;
 }
 function autoCorrelate(buf, sampleRate) {
-  var SIZE = buf.length, rms = 0;
-  for (var i=0;i<SIZE;i++) rms += buf[i] * buf[i];
-  rms = Math.sqrt(rms / SIZE);
+  var size = buf.length, rms = 0;
+  for (var i=0;i<size;i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / size);
   if (rms < 0.01) return -1;
-  // trim quiet edges
-  var thresh = 0.2, r1 = 0, r2 = SIZE - 1;
-  for (var a=0;a<SIZE/2;a++) if (Math.abs(buf[a]) < thresh) { r1 = a; break; }
-  for (var b=1;b<SIZE/2;b++) if (Math.abs(buf[SIZE-b]) < thresh) { r2 = SIZE - b; break; }
-  var trimmed = buf.subarray(r1, r2);
-  var n = trimmed.length;
-  if (n < 128) return -1;
-  if (n > 2048) n = 2048;                 // cap window so cost stays bounded on mobile
-  // Only search lags inside the pitch range we actually care about (~70–1400 Hz).
-  var minLag = Math.max(2, Math.floor(sampleRate / 1400));
-  var maxLag = Math.min(n - 1, Math.ceil(sampleRate / 70));
-  var c = new Float32Array(maxLag + 1);
-  for (var lag=0; lag<=maxLag; lag++) {
-    var sum = 0;
-    for (var k=0;k<n-lag;k++) sum += trimmed[k] * trimmed[k+lag];
-    c[lag] = sum;
-  }
-  // walk past the zero-lag peak, then take the strongest peak in range
-  var d = 0; while (d < maxLag && c[d] > c[d+1]) d++;
-  var start = Math.max(d, minLag);
-  var maxVal = -Infinity, maxPos = -1;
-  for (var l=start;l<=maxLag;l++) if (c[l] > maxVal) { maxVal = c[l]; maxPos = l; }
-  if (maxPos <= 0) return -1;
+  var r1=0, r2=size-1, thresh=0.2;
+  for (var a=0;a<size/2;a++) if (Math.abs(buf[a]) < thresh) { r1=a; break; }
+  for (var b=1;b<size/2;b++) if (Math.abs(buf[size-b]) < thresh) { r2=size-b; break; }
+  var trimmed = buf.slice(r1, r2); size = trimmed.length;
+  if (size < 64) return -1;
+  var c = new Float32Array(size);
+  for (var i2=0;i2<size;i2++) for (var j=0;j<size-i2;j++) c[i2] += trimmed[j] * trimmed[j+i2];
+  var d=0;
+  while (c[d] > c[d+1]) { d++; if (d >= size - 1) return -1; }
+  var maxVal=-1, maxPos=-1;
+  for (var i3=d;i3<size;i3++) if (c[i3] > maxVal) { maxVal = c[i3]; maxPos = i3; }
   var T0 = maxPos;
-  if (T0 > 0 && T0 < maxLag) {
+  if (T0 > 0 && T0 < size - 1) {
     var x1=c[T0-1], x2=c[T0], x3=c[T0+1], aa=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
     if (aa) T0 = T0 - bb / (2 * aa);
   }
