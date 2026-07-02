@@ -1030,6 +1030,7 @@ var T = {
     flexHint: "Wechsle zwischen den Tönen, ohne die Ventile zu ändern – nur mit Luft und Lippenspannung.",
     flexWhy: "Bindungen machen den Ansatz flexibel – der Schlüssel zu Höhe und leichtem Spiel.",
     flexSameFing: "Gleicher Griff! Nur Luft & Lippen bewegen den Ton.",
+    reAttack: "Gleicher Ton nochmal – kurz mit der Zunge anstoßen!",
     scaleWsCard: "Tonleiter-Werkstatt",
     scaleWsCardDesc: "Jede Tonart, jede Skala – auf & ab mit Mikrofon.",
     scaleWsTitle: "Tonleiter-Werkstatt",
@@ -1334,6 +1335,7 @@ var T = {
     flexHint: "Move between the tones without changing valves – only air and lip tension.",
     flexWhy: "Slurs make the embouchure flexible – the key to range and easy playing.",
     flexSameFing: "Same fingering! Only air & lips move the tone.",
+    reAttack: "Same note again – give it a quick tongue attack!",
     scaleWsCard: "Scale Workshop",
     scaleWsCardDesc: "Every key, every scale – up & down with the microphone.",
     scaleWsTitle: "Scale Workshop",
@@ -2191,8 +2193,9 @@ function jazzAdvanceAfterMatch() {
     return;
   }
   S.jazzStep++;
-  S.jazzWaitRelease = true;   // require a short silence before the next note counts
+  S.jazzWaitRelease = true;   // released by silence, a pitch change, or a tongued re-attack
   S.jazzReleaseCount = 0;
+  gateArm(gateJazz, S.jazzPhrase[S.jazzStep - 1].soundingMidi);
   render();
 }
 function jazzDetect(freq) {
@@ -2208,9 +2211,14 @@ function jazzDetect(freq) {
   // Gate stays closed until the player releases (silence), so a single sustained
   // tone or a repeated pitch can't roll through several notes at once.
   if (S.jazzWaitRelease) {
-    S.jazzOnTarget = false;
-    renderMicDisplay(tr('yourTurn'), 0, tol().answerStable);
-    return true;
+    if (gateOpen(gateJazz, midi)) {
+      S.jazzWaitRelease = false;
+      S.jazzReleaseCount = 0;
+    } else {
+      S.jazzOnTarget = false;
+      renderMicDisplay(cur.soundingMidi === gateJazz.prev ? tr('reAttack') : tr('yourTurn'), 0, tol().answerStable);
+      return true;
+    }
   }
   var onTarget = (midi === cur.soundingMidi) && (Math.abs(S.micDetectedCents) <= tol().answerCents);
   S.jazzOnTarget = onTarget;
@@ -3592,6 +3600,7 @@ function echoListen() {
 function echoCommit(writtenMidi) {
   S.echoInput.push(writtenMidi);
   S.echoWaitRel = true; S.echoRelCount = 0; _eMidi = -1; _eCount = 0;
+  gateArm(gateEcho, writtenMidi + TRANS[S.transposition].semitones);
   if (S.echoInput.length >= S.echoSeq.length) {
     var win = true;
     for (var i = 0; i < S.echoSeq.length; i++) if (S.echoInput[i] !== S.echoSeq[i]) win = false;
@@ -3616,7 +3625,16 @@ function echoCommit(writtenMidi) {
 function echoDetect(freq) {
   if (S.echoPhase !== 'play') return;
   bumpActive();
-  if (S.echoWaitRel) return;
+  if (S.echoWaitRel) {
+    if (gateOpen(gateEcho, midiToRounded(freq))) {
+      S.echoWaitRel = false;
+      S.echoRelCount = 0;
+    } else {
+      var elw = document.getElementById('echo-live');
+      if (elw && S.echoSeq[S.echoInput.length] === (gateEcho.prev - TRANS[S.transposition].semitones)) elw.textContent = tr('reAttack');
+      return;
+    }
+  }
   var midi = midiToRounded(freq);
   if (midi === _eMidi) _eCount++; else { _eMidi = midi; _eCount = 1; }
   var need = Math.max(6, tol().answerStable - 2);
@@ -3810,6 +3828,42 @@ function songComplete() {
   saveSettings();
   render();
 }
+// =========================================================================
+//  Articulation-aware gate release.
+//  After a note is matched, the gate closes so one sustained tone can't roll
+//  through several phrase steps. It re-opens on any of:
+//   (a) a pitch change (2 stable frames)  -> slurs work without a breath
+//   (b) a fast level dip-and-rise on the SAME pitch -> tongued repeats ("ta")
+//   (c) a short silence (existing no-pitch counters in the *OnNoPitch handlers)
+// =========================================================================
+var gateJazz = { prev: -1, lv: 0.02, dip: false, dipT: 0, diffN: 0 };
+var gateSong = { prev: -1, lv: 0.02, dip: false, dipT: 0, diffN: 0 };
+var gateEcho = { prev: -1, lv: 0.02, dip: false, dipT: 0, diffN: 0 };
+function gateArm(g, prevSoundingMidi) {
+  g.prev = prevSoundingMidi;
+  g.lv = Math.max(S.micLevelSm, 0.02);
+  g.dip = false; g.dipT = 0; g.diffN = 0;
+}
+function gateOpen(g, midi) {
+  if (midi !== g.prev) {
+    g.diffN++;
+    return g.diffN >= 2;             // real pitch change, not a single jitter frame
+  }
+  g.diffN = 0;
+  var l = S.micLevelSm, now = Date.now();
+  if (l < g.lv * 0.55) {
+    if (!g.dip) { g.dip = true; g.dipT = now; }
+    return false;
+  }
+  if (g.dip) {
+    if (now - g.dipT > 380) { g.dip = false; g.lv = Math.max(l, 0.02); }
+    else if (l > g.lv * 0.78) return true;   // fast dip-and-rise = re-attack
+  } else if (l > g.lv) {
+    g.lv = g.lv * 0.9 + l * 0.1;             // follow a growing sustain
+  }
+  return false;
+}
+
 function songDetect(freq) {
   if (S.songMode !== 'play' || S.songCompleted) { renderMicDisplay(tr('tuningWaiting')); return; }
   bumpActive();
@@ -3820,7 +3874,15 @@ function songDetect(freq) {
   S.micDetectedName = mapped ? mapped.name : '';
   S.micDetectedWritten = mapped ? mapped.display : '';
   S.micDetectedCents = centsOff(freq, cur.soundingMidi);
-  if (S.songWaitRel) { renderMicDisplay(tr('yourTurn'), 0, tol().answerStable); return; }
+  if (S.songWaitRel) {
+    if (gateOpen(gateSong, midi)) {
+      S.songWaitRel = false;
+      S.songRelCount = 0;
+    } else {
+      renderMicDisplay(cur.soundingMidi === gateSong.prev ? tr('reAttack') : tr('yourTurn'), 0, tol().answerStable);
+      return;
+    }
+  }
   var onTarget = (midi === cur.soundingMidi) && (Math.abs(S.micDetectedCents) <= tol().answerCents);
   if (onTarget) {
     S.songMatch++;
@@ -3831,6 +3893,7 @@ function songDetect(freq) {
       if (S.songStep >= S.songPhrase.length - 1) { songComplete(); return; }
       S.songStep++;
       S.songWaitRel = true; S.songRelCount = 0;
+      gateArm(gateSong, cur.soundingMidi);
       render();
     }
   } else {
