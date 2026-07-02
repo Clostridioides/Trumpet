@@ -135,6 +135,22 @@ svg.staff{width:100%;height:auto;margin:8px 0}
 .ach .a-n{font-size:.76em;font-weight:bold;line-height:1.2}
 .ach .a-d{font-size:.64em;color:#999;line-height:1.25}
 #confetti-c{position:fixed;inset:0;pointer-events:none;z-index:70}
+/* ===== v3 ===== */
+.rec-row{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:8px 0;width:100%}
+.rec-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ef4444;margin-right:6px;animation:recpulse 1s infinite}
+@keyframes recpulse{0%,100%{opacity:1}50%{opacity:.25}}
+audio{width:100%;margin-top:6px;border-radius:8px;height:38px}
+.rh-track{display:flex;gap:4px;width:100%;margin:10px 0;align-items:stretch}
+.rh-b{height:28px;border-radius:6px;background:rgba(255,255,255,.10);border:1.5px solid rgba(255,255,255,.15);transition:all .1s;min-width:8px}
+.rh-b.cur{border-color:#f0c040;box-shadow:0 0 8px rgba(240,192,64,.35)}
+.rh-b.p{background:rgba(34,197,94,.55);border-color:#22c55e}
+.rh-b.g{background:rgba(240,192,64,.5);border-color:#f0c040}
+.rh-b.o{background:rgba(240,150,64,.42);border-color:#e0a020}
+.rh-b.m{background:rgba(239,68,68,.35);border-color:#ef4444}
+.beat-big{font-size:2.5em;font-weight:bold;color:#f0c040;text-align:center;min-height:1.15em;font-variant-numeric:tabular-nums}
+.intv-big{font-size:1.55em;font-weight:bold;color:#f0c040;text-align:center;margin-top:6px;min-height:1.2em}
+.daily-cta{width:100%;padding:12px;border-radius:12px;border:1.5px solid rgba(165,180,252,.5);background:linear-gradient(135deg,rgba(99,102,241,.18),rgba(99,102,241,.05));color:#c7d2fe;font-family:Georgia,serif;font-size:1em;font-weight:bold;cursor:pointer;margin-bottom:12px;-webkit-tap-highlight-color:transparent}
+.daily-cta:active{transform:scale(.985)}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 
 
@@ -255,11 +271,18 @@ var S = {
 
   // guided path & achievements
   journey: { done: {}, cnt: {} },
-  achieved: {}
+  achieved: {},
+
+  // ---- v3 additions ----
+  fromDaily: false,
+  songBacking: true,
+  rhythm: { best: {} },      // pulse/eighth/pattern scores, tongueN, tongueEven
+  drone: { best: 0 },        // longest in-tune hold (s)
+  dailyLog: {}               // 'YYYY-MM-DD' -> 1
 };
 
 // ---- Settings persistence ----
-var PERSIST_KEYS = ['lang','difficulty','mode','transposition','concertA','tuningTargetWrittenMidi','toleranceMode','autoAdvance','adaptive','metronome','stats','jazzProgress','songProgress','echo','lt','dyn','journey','achieved','songTempo'];
+var PERSIST_KEYS = ['lang','difficulty','mode','transposition','concertA','tuningTargetWrittenMidi','toleranceMode','autoAdvance','adaptive','metronome','stats','jazzProgress','songProgress','echo','lt','dyn','journey','achieved','songTempo','rhythm','drone','dailyLog','songBacking'];
 function saveSettings() {
   try {
     var o = {};
@@ -537,6 +560,19 @@ var SONGS = [
 ];
 function songById(id){ for (var i=0;i<SONGS.length;i++) if (SONGS[i].id === id) return SONGS[i]; return null; }
 
+// Chords per song: [writtenRootMidi, 'M'|'m'|'7', beats]. Pickup beats stay silent.
+var SONG_CHORDS = {
+ entchen:[[60,'M',4],[60,'M',4],[65,'M',4],[60,'M',4],[65,'M',4],[60,'M',4],[65,'M',4],[60,'M',4],[67,'7',4],[60,'M',4]],
+ haenschen:[[60,'M',4],[67,'7',4],[60,'M',8],[60,'M',4],[67,'7',4],[60,'M',8]],
+ oldmac:[[60,'M',4],[65,'M',2],[60,'M',2],[60,'M',2],[67,'7',2],[60,'M',4]],
+ bruder:[[60,'M',32]],
+ ode:[[60,'M',8],[67,'7',4],[60,'M',4],[60,'M',8],[67,'7',4],[60,'M',4]],
+ jingle:[[60,'M',16],[65,'M',4],[60,'M',4],[67,'7',4],[60,'M',4]],
+ saints:[[60,'M',20],[67,'7',8],[60,'M',4],[65,'M',4],[60,'M',4],[67,'7',4],[60,'M',4]],
+ amazing:[[65,'M',3],[65,'M',3],[70,'M',3],[60,'7',3],[65,'M',3],[65,'M',3],[65,'M',3]]
+};
+function songChords(id){ return SONG_CHORDS[id] || null; }
+
 var FLEX_LESSONS = [
  {id:'fx1', level:1, tempo:52, swing:false, hint:true,
   name_de:'C ↔ G (offen)', name_en:'C ↔ G (open)',
@@ -708,6 +744,34 @@ var JOURNEY = [
     goal_de:'Spiele „Amazing Grace“ komplett durch.',
     goal_en:'Play “Amazing Grace” all the way through.',
     m:{t:'song', ids:['amazing']}, go:{screen:'song', song:'amazing'}}
+  ]},
+ {id:'p5', name_de:'Feinschliff', name_en:'Polish',
+  desc_de:'Timing, Intonation und Routine – der Unterschied zwischen Tönen und Musik.',
+  desc_en:'Timing, intonation and routine – the difference between notes and music.',
+  stations:[
+   {id:'st_pulse', icon:'🥁', name_de:'Auf den Punkt', name_en:'Right on the beat',
+    why_de:'Wer im Puls spielt, klingt sofort nach Band – Timing hört jeder.',
+    why_en:'Playing in the pulse instantly sounds like a band – everyone hears timing.',
+    goal_de:'Erreiche 70 % im Rhythmus-Trainer.', goal_en:'Score 70% in the rhythm trainer.',
+    m:{t:'rhythm', score:70}, go:{screen:'rhythm'}},
+   {id:'st_tongue', icon:'👅', name_de:'Zungen-Sprint', name_en:'Tongue sprint',
+    why_de:'Ein klarer Anstoß ist wie deutliches Sprechen – „ta, ta, ta".',
+    why_en:'A clean attack is like clear speech – “ta, ta, ta”.',
+    goal_de:'Schaffe 65 % Gleichmäßigkeit im Zungen-Sprint.',
+    goal_en:'Reach 65% evenness in the tongue sprint.',
+    m:{t:'tongue', even:65}, go:{screen:'rhythm', ex:'sprint'}},
+   {id:'st_drone', icon:'🎯', name_de:'Schwebungsfrei', name_en:'Beat-free',
+    why_de:'Wenn die Schwebungen verschwinden, bist du wirklich rein – das ist Intonation zum Anfassen.',
+    why_en:'When the beating disappears, you are truly in tune – intonation you can feel.',
+    goal_de:'Halte ein Intervall 3 s sauber gegen den Bordun.',
+    goal_en:'Hold an interval cleanly for 3 s against the drone.',
+    m:{t:'drone', sec:3}, go:{screen:'drone'}},
+   {id:'st_daily', icon:'📅', name_de:'Dein Tagestraining', name_en:'Your daily session',
+    why_de:'Zehn kluge Minuten schlagen eine planlose Stunde – Routine macht den Amateur.',
+    why_en:'Ten smart minutes beat an aimless hour – routine makes the amateur.',
+    goal_de:'Absolviere ein komplettes Tagestraining.',
+    goal_en:'Complete one full daily session.',
+    m:{t:'daily', n:1}, go:{screen:'daily'}}
   ]}
 ];
 
@@ -724,7 +788,10 @@ var ACH = [
  {id:'a_song4', icon:'📚', name_de:'Liederbuch', name_en:'Songbook', desc_de:'Vier Lieder gemeistert.', desc_en:'Mastered four songs.'},
  {id:'a_oct', icon:'🚀', name_de:'Oktav-Springer', name_en:'Octave jumper', desc_de:'Tonumfang von einer Oktave erreicht.', desc_en:'Reached a range of one octave.'},
  {id:'a_blues', icon:'🎷', name_de:'Blues-Geselle', name_en:'Blues journeyman', desc_de:'Alle Blues-Lektionen abgeschlossen.', desc_en:'Finished all blues lessons.'},
- {id:'a_lvl5', icon:'⭐', name_de:'Level 5', name_en:'Level 5', desc_de:'Level 5 erreicht.', desc_en:'Reached level 5.'}
+ {id:'a_lvl5', icon:'⭐', name_de:'Level 5', name_en:'Level 5', desc_de:'Level 5 erreicht.', desc_en:'Reached level 5.'},
+ {id:'a_metro', icon:'🥁', name_de:'Metronom-Freund', name_en:'Metronome friend', desc_de:'85 % im Rhythmus-Trainer.', desc_en:'85% in the rhythm trainer.'},
+ {id:'a_tongue40', icon:'👅', name_de:'Maschinengewehr', name_en:'Machine gun', desc_de:'40 Anstöße im Zungen-Sprint.', desc_en:'40 attacks in the tongue sprint.'},
+ {id:'a_daily1', icon:'📅', name_de:'Erstes Tagestraining', name_en:'First daily session', desc_de:'Ein Tagestraining abgeschlossen.', desc_en:'Completed one daily session.'}
 ];
 
 function baseNoteByMidi(midi) {
@@ -982,7 +1049,83 @@ var T = {
     tryAgain: "Nochmal",
     resultLbl: "Ergebnis",
     semitones: "Halbtöne",
-    notesLbl: "Töne"
+    notesLbl: "Töne",
+
+    dailyCard: "Tagestraining",
+    dailyTitle: "Tagestraining",
+    dailySub: "Vier Schritte, rund zehn Minuten – aus deinen Schwächen gebaut.",
+    dailyStepLbl: "Schritt",
+    dailyGo: "Los →",
+    dailyAgain: "Neu zusammenstellen",
+    dailyAbort: "Training beenden",
+    dailyAllDone: "Tagestraining geschafft! 💪",
+    dailyDoneToday: "heute ✓",
+    dailyMin: "~10 Min",
+    dailyLt: "Einen Ton 10 s halten",
+    dailyFlex: "Eine Bindung sauber nachspielen",
+    dailySong: "Ein Lied komplett mitspielen",
+    dailyQuiz: "8 Noten richtig beantworten",
+    backDaily: "← Tagestraining",
+    stepDone: "Schritt geschafft",
+
+    rhythmCard: "Rhythmus-Trainer",
+    rhythmCardDesc: "Timing & Zungenstoß – jeder Anstoß wird gemessen.",
+    rhythmTitle: "Rhythmus-Trainer",
+    rhythmHint: "Spiele einen bequemen Ton genau auf den Klick – die App erkennt jeden Tonanfang über das Mikrofon.",
+    rhythmWhy: "Timing ist das Rückgrat der Musik – der Puls zählt mehr als jeder einzelne Ton.",
+    rhPulse: "Viertel",
+    rhEighth: "Achtel",
+    rhPattern: "Muster",
+    rhSprint: "Zungen-Sprint",
+    rhStart: "▶ Start mit Einzähler",
+    rhRun: "Spiel auf den Klick!",
+    rhSprintRun: "Blas los – so viele saubere Anstöße wie möglich!",
+    rhAttacks: "Anstöße",
+    rhPerSec: "pro Sek.",
+    rhEven: "Gleichmäßigkeit",
+    rhAvgOff: "Ø-Abweichung",
+    rhHitsP: "perfekt",
+    rhHitsG: "gut",
+    rhHitsO: "okay",
+    rhHitsM: "daneben",
+    rhExtra: "extra",
+    rhClick: "Klick",
+    rhMuteHint: "Klick zu leise? Handy näher ans Ohr – oder Klick aus und dem Licht folgen.",
+
+    droneCard: "Bordun & Intonation",
+    droneCardDesc: "Gegen einen Halteton spielen, Schwebungen hören.",
+    droneTitle: "Bordun-Übung",
+    droneHint: "Der Bordun klingt dauerhaft. Spiele Intervalle dagegen: Je reiner du bist, desto ruhiger wird der Zusammenklang.",
+    droneWhy: "Schwebungen sind dein Kompass – verschwinden sie, stimmt die Intonation wirklich.",
+    droneNote: "Bordun-Ton",
+    droneTargetLbl: "Ziel-Intervall",
+    droneFree: "Frei",
+    droneOn: "🔊 Bordun an",
+    droneOff: "Bordun aus",
+    droneListen: "Spiel gegen den Bordun …",
+    droneLocking: "Rein! Halte …",
+    droneGot: "Sauber gehalten!",
+    droneBest: "Längster reiner Halt",
+    droneVolHint: "Tipp: Bordun eher leise – deine Trompete soll führen.",
+    intvNames: "Prime|Kleine Sekunde|Große Sekunde|Kleine Terz|Große Terz|Quarte|Tritonus|Quinte|Kleine Sexte|Große Sexte|Kleine Septime|Große Septime",
+    intvOctave: "Oktave",
+    below: "tiefer",
+
+    recBtn: "● Aufnehmen",
+    recStopBtn: "■ Stopp",
+    recLast: "Letzte Aufnahme",
+    recHint: "Nimm dich auf und hör direkt rein – so hörst du dich wie dein Publikum.",
+    recNoSupport: "Aufnahme wird von diesem Browser nicht unterstützt.",
+
+    backingLbl: "Begleitung",
+
+    backupTitle: "Fortschritt",
+    exportBtn: "💾 Sichern (Datei)",
+    importBtn: "📂 Laden",
+    exportDone: "Fortschritt als Datei gespeichert",
+    importDone: "Fortschritt geladen ✓",
+    importErr: "Datei konnte nicht gelesen werden",
+    backupHint: "Sichere deinen Fortschritt als Datei – z. B. vor einem Gerätewechsel."
   },
   en: {
     title: "Trumpet Studio",
@@ -1210,7 +1353,83 @@ var T = {
     tryAgain: "Try again",
     resultLbl: "Result",
     semitones: "semitones",
-    notesLbl: "notes"
+    notesLbl: "notes",
+
+    dailyCard: "Daily session",
+    dailyTitle: "Daily Session",
+    dailySub: "Four steps, about ten minutes – built from your weak spots.",
+    dailyStepLbl: "Step",
+    dailyGo: "Go →",
+    dailyAgain: "Rebuild plan",
+    dailyAbort: "End session",
+    dailyAllDone: "Daily session complete! 💪",
+    dailyDoneToday: "today ✓",
+    dailyMin: "~10 min",
+    dailyLt: "Hold one tone for 10 s",
+    dailyFlex: "Play one lip slur cleanly",
+    dailySong: "Play one song all the way",
+    dailyQuiz: "Answer 8 notes correctly",
+    backDaily: "← Daily session",
+    stepDone: "Step complete",
+
+    rhythmCard: "Rhythm Trainer",
+    rhythmCardDesc: "Timing & tonguing – every attack gets measured.",
+    rhythmTitle: "Rhythm Trainer",
+    rhythmHint: "Play one comfortable tone exactly on the click – the app detects every note onset through the microphone.",
+    rhythmWhy: "Timing is the backbone of music – the pulse matters more than any single note.",
+    rhPulse: "Quarters",
+    rhEighth: "Eighths",
+    rhPattern: "Pattern",
+    rhSprint: "Tongue sprint",
+    rhStart: "▶ Start with count-in",
+    rhRun: "Play on the click!",
+    rhSprintRun: "Go – as many clean attacks as you can!",
+    rhAttacks: "Attacks",
+    rhPerSec: "per sec",
+    rhEven: "Evenness",
+    rhAvgOff: "Avg. offset",
+    rhHitsP: "perfect",
+    rhHitsG: "good",
+    rhHitsO: "okay",
+    rhHitsM: "missed",
+    rhExtra: "extra",
+    rhClick: "Click",
+    rhMuteHint: "Click too quiet? Move the phone closer – or mute the click and follow the light.",
+
+    droneCard: "Drone & Intonation",
+    droneCardDesc: "Play against a sustained tone, hear the beating.",
+    droneTitle: "Drone Practice",
+    droneHint: "The drone keeps sounding. Play intervals against it: the purer you are, the calmer the blend.",
+    droneWhy: "Beats are your compass – when they vanish, your intonation is truly right.",
+    droneNote: "Drone note",
+    droneTargetLbl: "Target interval",
+    droneFree: "Free",
+    droneOn: "🔊 Drone on",
+    droneOff: "Drone off",
+    droneListen: "Play against the drone …",
+    droneLocking: "In tune! Hold …",
+    droneGot: "Held it cleanly!",
+    droneBest: "Longest pure hold",
+    droneVolHint: "Tip: keep the drone soft – your trumpet should lead.",
+    intvNames: "Unison|Minor second|Major second|Minor third|Major third|Fourth|Tritone|Fifth|Minor sixth|Major sixth|Minor seventh|Major seventh",
+    intvOctave: "Octave",
+    below: "below",
+
+    recBtn: "● Record",
+    recStopBtn: "■ Stop",
+    recLast: "Last take",
+    recHint: "Record yourself and listen back – hear what your audience hears.",
+    recNoSupport: "Recording is not supported by this browser.",
+
+    backingLbl: "Backing",
+
+    backupTitle: "Progress",
+    exportBtn: "💾 Save (file)",
+    importBtn: "📂 Load",
+    exportDone: "Progress saved as a file",
+    importDone: "Progress loaded ✓",
+    importErr: "Could not read that file",
+    backupHint: "Save your progress as a file – e.g. before switching devices."
   }
 };
 
@@ -1414,6 +1633,7 @@ function recordAnswer(note, correct) {
   playFeedback(correct);
   bumpActive();
   journeyEvent({ t: (S.quizType === 'ear' ? 'ear' : 'quiz'), correct: correct, mode: S.mode, diff: S.difficulty });
+  dailyEvent({ t: 'quiz', correct: correct });
   checkAchievements();
   saveSettings();
 }
@@ -1711,6 +1931,9 @@ function detectPitch() {
   for (var _i = 0; _i < buf.length; _i++) _r += buf[_i] * buf[_i];
   S.micLevel = Math.sqrt(_r / buf.length);
   S.micLevelSm = S.micLevelSm * 0.7 + S.micLevel * 0.3;
+
+  if (S.screen === 'rhythm') { rhythmFrame(); micRafId = requestAnimationFrame(detectPitch); return; }
+
   var freq = autoCorrelate(buf, micCtx.sampleRate);
 
   if (!(freq > 0 && freq > 110 && freq < 1500)) {
@@ -1724,6 +1947,7 @@ function detectPitch() {
     if (S.screen === 'dynamik')  { dynFrame(0); micRafId = requestAnimationFrame(detectPitch); return; }
     if (S.screen === 'song')     { songOnNoPitch(); renderMicDisplay(tr('tuningWaiting')); micRafId = requestAnimationFrame(detectPitch); return; }
     if (S.screen === 'echo')     { echoOnNoPitch(); micRafId = requestAnimationFrame(detectPitch); return; }
+    if (S.screen === 'drone')    { droneFrame(0); micRafId = requestAnimationFrame(detectPitch); return; }
     renderMicDisplay(tr('tuningWaiting'));
     micRafId = requestAnimationFrame(detectPitch);
     return;
@@ -1736,6 +1960,7 @@ function detectPitch() {
   if (S.screen === 'dynamik')  { dynFrame(freq); micRafId = requestAnimationFrame(detectPitch); return; }
   if (S.screen === 'song')     { songDetect(freq); micRafId = requestAnimationFrame(detectPitch); return; }
   if (S.screen === 'echo')     { echoDetect(freq); micRafId = requestAnimationFrame(detectPitch); return; }
+  if (S.screen === 'drone')    { droneFrame(freq); micRafId = requestAnimationFrame(detectPitch); return; }
 
   if (S.screen === 'setup' && S.setupTuningPhase) {
     var tuningTarget = getTuningNote();
@@ -1923,6 +2148,7 @@ function completeJazzLesson() {
   S.jazzDoneStep = S.jazzPhrase.length;
   ensureStats().xp = (ensureStats().xp || 0) + 20;
   markLessonDone(S.jazzLessonId); // unlocks the next lesson and persists it
+  dailyEvent({ t: 'lesson' });
   celebrate();
   render();
 }
@@ -2029,7 +2255,9 @@ function backToLessons() {
   pauseListening();
   clearJazzTimers();
   stopMetronome();
+  recAutoStop();
   if (S.fromJourney) { S.fromJourney = null; S.customLesson = null; S.screen = 'journey'; render(); return; }
+  if (S.fromDaily) { S.fromDaily = false; S.customLesson = null; S.screen = 'daily'; render(); return; }
   if (S.jazzBack === 'flexmenu') { S.customLesson = null; S.screen = 'flexmenu'; render(); return; }
   if (S.jazzBack === 'scalews')  { S.customLesson = null; S.screen = 'scalews'; render(); return; }
   S.customLesson = null;
@@ -2152,13 +2380,14 @@ function buildFingeringSVG(note) {
   return svg;
 }
 function goMenu() {
-  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop();
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop(); rhythmStop(); droneStop(); recAutoStop();
   if (S.fromJourney) { S.fromJourney = null; S.screen = 'journey'; render(); return; }
+  if (S.fromDaily) { S.fromDaily = false; S.screen = 'daily'; render(); return; }
   S.screen = 'menu'; render();
 }
 function goHome() {
-  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop();
-  S.fromJourney = null; S.screen = 'menu'; render();
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop(); rhythmStop(); droneStop(); recAutoStop();
+  S.fromJourney = null; S.fromDaily = false; S.screen = 'menu'; render();
 }
 function startMic() { startMicListening(); }
 function disconnectMicPersistent() { disconnectMic(); render(); }
@@ -2188,6 +2417,9 @@ function render() {
   else if (S.screen === 'songmenu') renderSongMenu(app);
   else if (S.screen === 'flexmenu') renderFlexMenu(app);
   else if (S.screen === 'scalews') renderScaleWs(app);
+  else if (S.screen === 'rhythm') renderRhythm(app);
+  else if (S.screen === 'drone') renderDrone(app);
+  else if (S.screen === 'daily') renderDaily(app);
   else renderQuiz(app);
 }
 function goTuner() {
@@ -2332,6 +2564,8 @@ function renderMenu(app) {
   h += '<div class="bar"><i style="width:' + pct + '%"></i></div>';
   h += '</div>';
 
+  h += '<button class="daily-cta" onclick="goDaily()">📅 ' + tr('dailyCard') + ' · ' + (S.dailyLog[todayKey()] ? tr('dailyDoneToday') : tr('dailyMin')) + '</button>';
+
   // --- today at a glance ---
   h += '<div class="today-row">';
   h += '<div class="today-chip"><b>🔥 ' + computeDayStreak() + '</b><span>' + tr('streakDays') + '</span></div>';
@@ -2355,6 +2589,8 @@ function renderMenu(app) {
   h += mc('🌀', 'flexCard', 'flexCardDesc', 'goFlexMenu()', false);
   h += mc('🪜', 'scaleWsCard', 'scaleWsCardDesc', 'goScaleWs()', false);
   h += mc('&#127927;', 'jazzCard', 'jazzCardDesc', "selectQuizType('jazz')", S.quizType === 'jazz');
+  h += mc('🥁', 'rhythmCard', 'rhythmCardDesc', 'goRhythm()', false);
+  h += mc('🎯', 'droneCard', 'droneCardDesc', 'goDrone()', false);
   h += mc('&#9201;', 'tunerCard', 'tunerCardDesc', 'goTuner()', false);
   h += '</div></div>';
 
@@ -2362,6 +2598,7 @@ function renderMenu(app) {
     h += renderJazzLessonPicker();
     h += renderStatsPanel();
     h += renderAchPanel();
+  h += renderBackupPanel();
     h += renderSettingsPanel();
     app.innerHTML = h;
     return;
@@ -2375,6 +2612,7 @@ function renderMenu(app) {
     h += '</div></div>';
     h += renderStatsPanel();
     h += renderAchPanel();
+  h += renderBackupPanel();
     h += renderSettingsPanel();
     h += '<button class="start-btn" onclick="startEar()">' + tr('startNow') + '</button>';
     app.innerHTML = h;
@@ -2395,6 +2633,7 @@ function renderMenu(app) {
 
   h += renderStatsPanel();
   h += renderAchPanel();
+  h += renderBackupPanel();
   h += renderSettingsPanel();
 
   // Smart start: click-only needs no tuning, so go straight in.
@@ -2751,7 +2990,7 @@ function minutesTotal() {
 function startHeartbeat() {
   if (_hbTimer) return;
   _hbTimer = setInterval(function(){
-    var practicing = ['quiz','jazz','song','echo','longtone','dynamik','setup','tuner'].indexOf(S.screen) >= 0;
+    var practicing = ['quiz','jazz','song','echo','longtone','dynamik','setup','tuner','rhythm','drone','daily'].indexOf(S.screen) >= 0;
     var active = S.micListening || (Date.now() - _lastActive < 45000);
     if (practicing && active) {
       var st = ensureStats(), k = new Date().toISOString().slice(0, 10);
@@ -2877,6 +3116,13 @@ function stationProgress(st) {
     var c2 = 0; m.ids.forEach(function(id){ if (S.jazzProgress && S.jazzProgress[id]) c2++; });
     return { done: false, cur: c2, goal: m.ids.length };
   }
+  if (m.t === 'rhythm') {
+    var rb = Math.max(S.rhythm.best.pulse || 0, S.rhythm.best.eighth || 0, S.rhythm.best.pattern || 0);
+    return { done: false, cur: Math.min(rb, m.score), goal: m.score, unit: '%' };
+  }
+  if (m.t === 'tongue') return { done: false, cur: Math.min(S.rhythm.best.tongueEven || 0, m.even), goal: m.even, unit: '%' };
+  if (m.t === 'drone') return { done: false, cur: Math.min(Math.floor(S.drone.best || 0), m.sec), goal: m.sec, unit: 's' };
+  if (m.t === 'daily') return { done: false, cur: Math.min(S.journey.cnt[st.id] || 0, m.n), goal: m.n };
   if (m.t === 'range') return { done: false, cur: Math.min(rangeSpan(), m.semis), goal: m.semis };
   return { done: false, cur: 0, goal: 1 };
 }
@@ -2893,6 +3139,8 @@ function journeyEvent(ev) {
     } else if (m.t === 'ear' && ev.t === 'ear' && ev.correct) {
       S.journey.cnt[st.id] = (S.journey.cnt[st.id] || 0) + 1; changed = true;
     } else if (m.t === 'echo' && ev.t === 'echo') {
+      S.journey.cnt[st.id] = (S.journey.cnt[st.id] || 0) + 1; changed = true;
+    } else if (m.t === 'daily' && ev.t === 'daily') {
       S.journey.cnt[st.id] = (S.journey.cnt[st.id] || 0) + 1; changed = true;
     }
     var p = stationProgress(st);
@@ -2941,6 +3189,9 @@ function launchStation(id) {
   if (g.screen === 'song') { openSong(g.song); return; }
   if (g.screen === 'flexmenu') { goFlexMenu(); return; }
   if (g.screen === 'scalews') { goScaleWs(g.root, g.scale); return; }
+  if (g.screen === 'rhythm') { goRhythm(g.ex); return; }
+  if (g.screen === 'drone') { goDrone(); return; }
+  if (g.screen === 'daily') { goDaily(); return; }
   if (g.screen === 'jazzmenu') {
     S.quizType = 'jazz';
     if (g.track) S.jazzTrack = g.track;
@@ -2989,7 +3240,7 @@ function renderJourney(app) {
   h += '<div class="nav-row" style="margin-top:8px"><button class="nav-btn back" onclick="goHome()">' + tr('backMenu') + '</button></div>';
   app.innerHTML = h;
 }
-function backLabel() { return S.fromJourney ? tr('backJourney') : tr('backMenu'); }
+function backLabel() { return S.fromJourney ? tr('backJourney') : (S.fromDaily ? tr('backDaily') : tr('backMenu')); }
 
 // =========================================================================
 //  LONG TONE STUDIO – the microphone made visible.
@@ -3045,6 +3296,7 @@ function ltFinish() {
     if (res.dur > (S.lt.bestAny || 0)) S.lt.bestAny = res.dur;
     ensureStats().xp = (ensureStats().xp || 0) + Math.min(20, Math.floor(res.dur));
     playFeedback(true);
+    dailyEvent({ t: 'lt', sec: res.dur });
     journeyEvent({ t: 'lt' });
     checkAchievements();
     saveSettings();
@@ -3170,6 +3422,7 @@ function renderLongtone(app) {
   }
   if (S.lt.bestAny) bestBits.push(tr('ltBestAny') + ': ' + S.lt.bestAny.toFixed(1) + ' s');
   if (bestBits.length) h += '<div class="small" style="text-align:center;margin-top:4px">🏆 ' + bestBits.join(' · ') + '</div>';
+  h += recControlsHTML();
   h += '<div class="nav-row" style="margin-top:10px"><button class="nav-btn back" onclick="goMenu()">' + backLabel() + '</button></div>';
   app.innerHTML = h;
   ltDraw();
@@ -3440,7 +3693,7 @@ function goSongMenu() {
 function openSong(id) {
   var song = songById(id);
   if (!song) return;
-  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome();
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); recAutoStop();
   S.songId = id;
   S.songPhrase = song.notes.map(function(pair){
     var n = phraseNote(pair[0]);
@@ -3484,6 +3737,7 @@ function songPlay() {
   var beat = songBeatMs(), t = 0, total = 0;
   S.songPhrase.forEach(function(n){ total += n.dur * beat; });
   S.refPlaybackUntil = Date.now() + total + 900;
+  if (S.songBacking) scheduleBacking(songChords(S.songId), (songCurrent() || {}).pickup || 0, beat);
   if (S.songMode === 'play') {
     // reference playback only – the learner keeps their place
     S.songPhrase.forEach(function(n){
@@ -3550,6 +3804,7 @@ function songComplete() {
   S.songProgress[S.songId] = true;
   ensureStats().xp = (ensureStats().xp || 0) + (first ? 40 : 15);
   celebrate();
+  dailyEvent({ t: 'song' });
   journeyEvent({ t: 'song' });
   checkAchievements();
   saveSettings();
@@ -3651,8 +3906,9 @@ function buildSongSVG(notes, currentStep, doneStep, meter, pickup) {
   return out;
 }
 function songBack() {
-  clearAutoAdvance(); pauseListening(); clearSongTimers(); stopMetronome();
+  clearAutoAdvance(); pauseListening(); clearSongTimers(); stopMetronome(); recAutoStop();
   if (S.fromJourney) { S.fromJourney = null; S.screen = 'journey'; render(); return; }
+  if (S.fromDaily) { S.fromDaily = false; S.screen = 'daily'; render(); return; }
   S.screen = 'songmenu'; render();
 }
 function renderSongMenu(app) {
@@ -3704,11 +3960,14 @@ function renderSong(app) {
     h += '</div>';
   }
 
+  h += recControlsHTML();
+
   if (S.songCompleted) h += '<div class="feedback correct">&#10003; ' + tr('songDone') + ' 🎉</div>';
 
   h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">';
   h += '<button class="ref-btn" onclick="' + (S.songPlaying ? 'songStop()' : 'songPlay()') + '">' + (S.songPlaying ? tr('stopPhrase') : tr('playSong')) + '</button>';
   h += '<button class="ref-btn" onclick="songReplayNote()">' + tr('replayNote') + '</button>';
+  h += '<button class="ref-btn" onclick="toggleBacking()" style="' + (S.songBacking ? 'background:rgba(240,192,64,0.25);border-color:#f0c040' : '') + '">🎹 ' + tr('backingLbl') + ': ' + (S.songBacking ? tr('on') : tr('off')) + '</button>';
   h += '</div>';
   if (S.songMode === 'listen') {
     h += '<div class="nav-row"><button class="nav-btn back" onclick="songStepBack()">' + tr('stepBack') + '</button><button class="nav-btn next" onclick="songStepFwd()">' + tr('stepFwd') + '</button></div>';
@@ -3821,6 +4080,623 @@ function renderScaleWs(app) {
   app.innerHTML = h;
 }
 
+
+// =========================================================================
+//  v3 MODULES
+//  recording · song backing · rhythm & tonguing trainer · drone/intonation
+//  daily session · progress export/import
+// =========================================================================
+
+function ensureDefaults() {
+  if (!S.echo || typeof S.echo.level !== 'number') S.echo = { level: 1, wins: 0, best: 0 };
+  if (!S.lt || !S.lt.best) S.lt = { best: {}, bestAny: 0 };
+  if (!S.dyn || !S.dyn.best) S.dyn = { best: {} };
+  if (!S.journey || !S.journey.done) S.journey = { done: {}, cnt: {} };
+  if (!S.journey.cnt) S.journey.cnt = {};
+  if (!S.songProgress) S.songProgress = {};
+  if (!S.achieved) S.achieved = {};
+  if (!S.rhythm || !S.rhythm.best) S.rhythm = { best: {} };
+  if (!S.drone || typeof S.drone.best !== 'number') S.drone = { best: 0 };
+  if (!S.dailyLog) S.dailyLog = {};
+  if (S.songBacking === undefined) S.songBacking = true;
+}
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+
+// ---- recording: capture the mic, listen back ----
+var recRecorder = null, recChunks = [], recUrl = null, recState = 'idle', recStartAt = 0, recTimer = null;
+function recSupported() { return typeof MediaRecorder !== 'undefined'; }
+function ensureMicThen(cb) {
+  if (micStream) { cb(); return; }
+  startMicListening();
+  var tries = 0;
+  var iv = setInterval(function(){
+    tries++;
+    if (micStream) { clearInterval(iv); cb(); }
+    else if (tries > 16) clearInterval(iv);
+  }, 250);
+}
+function recToggle() { if (recState === 'rec') recStop(); else recStart(); }
+function recStart() {
+  if (!recSupported()) { toast(tr('recNoSupport')); return; }
+  ensureMicThen(function(){
+    if (!micStream || recState === 'rec') return;
+    recChunks = [];
+    try { recRecorder = new MediaRecorder(micStream); }
+    catch (e) { toast(tr('recNoSupport')); return; }
+    recRecorder.ondataavailable = function(e){ if (e.data && e.data.size) recChunks.push(e.data); };
+    recRecorder.onstop = function(){
+      try {
+        var blob = new Blob(recChunks, { type: (recRecorder && recRecorder.mimeType) || 'audio/webm' });
+        if (recUrl) URL.revokeObjectURL(recUrl);
+        recUrl = URL.createObjectURL(blob);
+      } catch (e) {}
+      recState = 'done';
+      if (recTimer) { clearInterval(recTimer); recTimer = null; }
+      render();
+    };
+    recRecorder.start();
+    recState = 'rec'; recStartAt = Date.now();
+    recTimer = setInterval(function(){
+      var el = document.getElementById('rec-timer');
+      if (el) el.textContent = Math.round((Date.now() - recStartAt) / 1000) + ' s';
+    }, 300);
+    render();
+  });
+}
+function recStop() {
+  if (recRecorder && recState === 'rec') {
+    try { recRecorder.stop(); } catch (e) { recState = 'idle'; if (recTimer) { clearInterval(recTimer); recTimer = null; } }
+  }
+}
+function recAutoStop() { if (recState === 'rec') recStop(); }
+function recControlsHTML() {
+  if (!recSupported()) return '';
+  var h = '<div class="rec-row">';
+  if (recState === 'rec') {
+    h += '<button class="ref-btn" style="border-color:#ef4444;color:#ef4444" onclick="recToggle()"><span class="rec-dot"></span>' + tr('recStopBtn') + ' <span id="rec-timer"></span></button>';
+  } else {
+    h += '<button class="ref-btn" onclick="recToggle()">' + tr('recBtn') + '</button>';
+    h += '<span class="small">' + tr('recHint') + '</span>';
+  }
+  h += '</div>';
+  if (recState !== 'rec' && recUrl) {
+    h += '<div class="small" style="width:100%;text-align:left">🎧 ' + tr('recLast') + ':</div>';
+    h += '<audio controls src="' + recUrl + '"></audio>';
+  }
+  return h;
+}
+
+// ---- song backing: soft pads + bass from the chord table ----
+var CHORD_IV = { M: [0, 4, 7], m: [0, 3, 7], 7: [0, 4, 10] };
+function playPad(rootW, q, durS) {
+  try {
+    var ctx = ensureAudioCtx(), t = ctx.currentTime, semi = TRANS[S.transposition].semitones;
+    (CHORD_IV[q] || CHORD_IV.M).forEach(function(iv){
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = midiToFreq(rootW + semi + iv);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.045, t + 0.09);
+      g.gain.setValueAtTime(0.045, t + Math.max(0.1, durS - 0.18));
+      g.gain.linearRampToValueAtTime(0.0001, t + durS);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t); o.stop(t + durS + 0.05);
+    });
+  } catch (e) {}
+}
+function playBass(rootW, durS) {
+  try {
+    var ctx = ensureAudioCtx(), t = ctx.currentTime, semi = TRANS[S.transposition].semitones;
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.value = midiToFreq(rootW + semi - 24);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (durS || 0.3));
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + (durS || 0.3) + 0.05);
+  } catch (e) {}
+}
+function scheduleBacking(chords, pickup, beatMs) {
+  if (!chords) return;
+  var t = (pickup || 0) * beatMs;
+  chords.forEach(function(ch){
+    var rootW = ch[0], q = ch[1], beats = ch[2];
+    (function(at, r, qq, d){
+      songTimers.push(setTimeout(function(){ playPad(r, qq, d); }, at));
+    })(t, rootW, q, beats * beatMs / 1000);
+    for (var b = 0; b < beats; b += 2) {
+      (function(at, r){
+        songTimers.push(setTimeout(function(){ playBass(r, 0.32); }, at));
+      })(t + b * beatMs, rootW);
+    }
+    t += beats * beatMs;
+  });
+}
+function toggleBacking() { S.songBacking = !S.songBacking; saveSettings(); render(); }
+
+// =========================================================================
+//  RHYTHM & TONGUING TRAINER – every attack is measured via onset detection.
+// =========================================================================
+var RH = { ex: 'pulse', tempo: 80, click: true, phase: 'idle', runStart: 0, runLen: 0,
+           expected: [], durs: [], hits: [], extra: 0, sprint: [],
+           env: 0.004, lastOnset: 0, fc: 0, result: null };
+var rhTimers = [];
+function rhClearTimers() { rhTimers.forEach(function(t){ clearTimeout(t); }); rhTimers = []; }
+function rhythmStop() { RH.phase = 'idle'; rhClearTimers(); }
+function goRhythm(ex) {
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop(); droneStop();
+  rhythmStop(); RH.result = null;
+  if (ex) RH.ex = ex;
+  S.screen = 'rhythm'; render();
+}
+function rhPickEx(ex) { rhythmStop(); RH.ex = ex; RH.result = null; render(); }
+function setRhTempo(d) { RH.tempo = Math.max(56, Math.min(132, RH.tempo + d)); render(); }
+function rhToggleClick() { RH.click = !RH.click; render(); }
+function rhPlanFor(ex, beatMs) {
+  var e = [], d = [];
+  if (ex === 'pulse') { for (var i = 0; i < 8; i++) { e.push(i * beatMs); d.push(1); } }
+  else if (ex === 'eighth') { for (var j = 0; j < 16; j++) { e.push(j * beatMs / 2); d.push(0.5); } }
+  else {
+    var pat = [1, 1, 0.5, 0.5, 1, 0.5, 0.5, 1, 1, 1]; // ta ta ti-ti ta | ti-ti ta ta ta
+    var c = 0;
+    pat.forEach(function(x){ e.push(c * beatMs); d.push(x); c += x; });
+  }
+  return { expected: e, durs: d, lenMs: 8 * beatMs };
+}
+function rhStart() {
+  rhythmStop(); RH.result = null;
+  startMicListening();
+  var beatMs = Math.round(60000 / RH.tempo);
+  var isSprint = RH.ex === 'sprint';
+  var plan = isSprint ? { expected: [], durs: [], lenMs: 8000 } : rhPlanFor(RH.ex, beatMs);
+  RH.expected = plan.expected;
+  RH.durs = plan.durs;
+  RH.runLen = plan.lenMs;
+  RH.hits = RH.expected.map(function(){ return null; });
+  RH.extra = 0; RH.sprint = [];
+  RH.env = 0.004; RH.lastOnset = 0; RH.fc = 0;
+  RH.phase = 'count';
+  var cb = isSprint ? 600 : beatMs;
+  S.refPlaybackUntil = Date.now() + 4 * cb + 40;
+  for (var i = 0; i < 4; i++) (function(k){
+    rhTimers.push(setTimeout(function(){
+      playClick(k === 0);
+      var el = document.getElementById('rh-beat');
+      if (el) el.textContent = String(k + 1);
+    }, k * cb));
+  })(i);
+  var t0 = 4 * cb;
+  rhTimers.push(setTimeout(function(){
+    if (S.screen !== 'rhythm') { rhythmStop(); return; }
+    RH.phase = 'run'; RH.runStart = Date.now();
+  }, t0));
+  if (!isSprint && RH.click) {
+    for (var b = 0; b < 8; b++) (function(k){
+      rhTimers.push(setTimeout(function(){ if (RH.phase === 'run') playClick(k % 4 === 0); }, t0 + k * beatMs));
+    })(b);
+  }
+  render();
+}
+function rhOnset(now) {
+  if (RH.phase !== 'run') return;
+  if (RH.ex === 'sprint') {
+    RH.sprint.push(now - RH.runStart);
+    var el = document.getElementById('rh-live');
+    if (el) el.textContent = RH.sprint.length + ' ' + tr('rhAttacks');
+    return;
+  }
+  var rel = now - RH.runStart, bi = -1, bd = 1e9;
+  for (var i = 0; i < RH.expected.length; i++) {
+    if (RH.hits[i]) continue;
+    var d = rel - RH.expected[i];
+    if (Math.abs(d) < Math.abs(bd)) { bd = d; bi = i; }
+  }
+  if (bi >= 0 && Math.abs(bd) <= 180) {
+    RH.hits[bi] = { d: Math.round(bd), cls: Math.abs(bd) <= 45 ? 'p' : (Math.abs(bd) <= 90 ? 'g' : 'o') };
+  } else {
+    RH.extra++;
+  }
+}
+function rhythmFrame() {
+  var now = Date.now(), lv = S.micLevel;
+  if (lv > 0.028 && lv > RH.env * 2.1 && (now - RH.lastOnset) > 115) {
+    RH.lastOnset = now;
+    rhOnset(now);
+  }
+  RH.env = RH.env * 0.9 + lv * 0.1;
+  var lvl = document.getElementById('rh-lvl');
+  if (lvl) lvl.style.width = Math.min(100, Math.round(S.micLevelSm * 900)) + '%';
+  if (RH.phase !== 'run') return;
+  var rel = now - RH.runStart;
+  RH.fc++;
+  if (RH.fc % 4 === 0) {
+    var bEl = document.getElementById('rh-beat');
+    if (bEl) {
+      if (RH.ex === 'sprint') bEl.textContent = Math.max(0, (RH.runLen - rel) / 1000).toFixed(1);
+      else bEl.textContent = String((Math.floor(rel / Math.round(60000 / RH.tempo)) % 4) + 1);
+    }
+    var tk = document.getElementById('rh-track');
+    if (tk) tk.innerHTML = rhTrackHTML();
+  }
+  if (rel >= RH.runLen + 230) rhFinish();
+}
+function rhTrackHTML() {
+  var rel = RH.phase === 'run' ? (Date.now() - RH.runStart) : 1e9;
+  var h = '';
+  for (var i = 0; i < RH.expected.length; i++) {
+    var c = 'rh-b', hit = RH.hits[i];
+    if (hit) c += ' ' + hit.cls;
+    else if (rel > RH.expected[i] + 180) c += ' m';
+    else if (RH.phase === 'run' && Math.abs(rel - RH.expected[i]) <= 140) c += ' cur';
+    h += '<div class="' + c + '" style="flex-grow:' + (RH.durs[i] * 10) + '"></div>';
+  }
+  return h;
+}
+function rhFinish() {
+  RH.phase = 'result'; rhClearTimers();
+  if (RH.ex === 'sprint') {
+    var n = RH.sprint.length, even = 0;
+    if (n >= 3) {
+      var iv = [];
+      for (var i = 1; i < n; i++) iv.push(RH.sprint[i] - RH.sprint[i - 1]);
+      var mean = iv.reduce(function(a, b){ return a + b; }, 0) / iv.length;
+      var sd = Math.sqrt(iv.reduce(function(a, b){ return a + (b - mean) * (b - mean); }, 0) / iv.length);
+      even = Math.max(0, Math.min(100, Math.round(100 - (sd / Math.max(1, mean)) * 260)));
+    }
+    RH.result = { sprint: true, n: n, ps: Math.round(n / 8 * 10) / 10, even: even };
+    if (n > (S.rhythm.best.tongueN || 0)) S.rhythm.best.tongueN = n;
+    if (n >= 10 && even > (S.rhythm.best.tongueEven || 0)) S.rhythm.best.tongueEven = even;
+    ensureStats().xp = (ensureStats().xp || 0) + Math.min(20, Math.round(n / 2));
+    playFeedback(n >= 16);
+    journeyEvent({ t: 'tongue' });
+  } else {
+    var pts = 0, cnt = { p: 0, g: 0, o: 0, m: 0 }, sum = 0, hn = 0;
+    RH.hits.forEach(function(h){
+      if (!h) { cnt.m++; return; }
+      cnt[h.cls]++;
+      pts += h.cls === 'p' ? 100 : (h.cls === 'g' ? 75 : 45);
+      sum += Math.abs(h.d); hn++;
+    });
+    var score = Math.round(pts / (RH.expected.length * 100) * 100);
+    RH.result = { sprint: false, score: score, cnt: cnt, avg: hn ? Math.round(sum / hn) : 0, extra: RH.extra };
+    if (score > (S.rhythm.best[RH.ex] || 0)) S.rhythm.best[RH.ex] = score;
+    ensureStats().xp = (ensureStats().xp || 0) + Math.round(score / 5);
+    playFeedback(score >= 70);
+    journeyEvent({ t: 'rhythm' });
+  }
+  checkAchievements();
+  saveSettings();
+  render();
+}
+function renderRhythm(app) {
+  var isSprint = RH.ex === 'sprint';
+  var h = '<h1>🥁 ' + tr('rhythmTitle') + '</h1>';
+  h += '<div class="subtitle">' + tr('rhythmHint') + '</div>';
+  h += '<div class="why-line">' + tr('rhythmWhy') + '</div>';
+  h += '<div class="chip-row">';
+  [['pulse','rhPulse'],['eighth','rhEighth'],['pattern','rhPattern'],['sprint','rhSprint']].forEach(function(p){
+    h += '<div class="chip' + (RH.ex === p[0] ? ' selected' : '') + '" onclick="rhPickEx(\'' + p[0] + '\')">' + tr(p[1]) + '</div>';
+  });
+  h += '</div>';
+  if (!isSprint) {
+    h += '<div class="chip-row" style="margin:2px 0"><div class="chip" onclick="setRhTempo(-8)">−</div><div class="chip selected">' + tr('tempo') + ' ' + RH.tempo + '</div><div class="chip" onclick="setRhTempo(8)">+</div>';
+    h += '<div class="chip' + (RH.click ? ' selected' : '') + '" onclick="rhToggleClick()">🔔 ' + tr('rhClick') + ': ' + (RH.click ? tr('on') : tr('off')) + '</div></div>';
+  }
+  h += '<div class="beat-big" id="rh-beat">' + (RH.phase === 'run' ? '' : '♩') + '</div>';
+  if (!isSprint) h += '<div class="rh-track" id="rh-track">' + rhTrackHTML() + '</div>';
+  else h += '<div class="combo-status" id="rh-live">' + (RH.phase === 'run' ? '' : '&nbsp;') + '</div>';
+  h += '<div class="lvl-wrap"><i id="rh-lvl" style="width:0%"></i></div>';
+  var status = '&nbsp;';
+  if (RH.phase === 'count') status = '3 · 2 · 1 …';
+  else if (RH.phase === 'run') status = isSprint ? tr('rhSprintRun') : tr('rhRun');
+  h += '<div class="combo-status">' + status + '</div>';
+  if (RH.result) {
+    h += '<div class="result-card"><strong>' + tr('resultLbl') + '</strong><div class="rc-row">';
+    if (RH.result.sprint) {
+      h += '<div><b>' + RH.result.n + '</b><span>' + tr('rhAttacks') + '</span></div>';
+      h += '<div><b>' + RH.result.ps + '</b><span>' + tr('rhPerSec') + '</span></div>';
+      h += '<div><b>' + RH.result.even + '%</b><span>' + tr('rhEven') + '</span></div>';
+    } else {
+      h += '<div><b>' + RH.result.score + '%</b><span>Score</span></div>';
+      h += '<div><b>±' + RH.result.avg + ' ms</b><span>' + tr('rhAvgOff') + '</span></div>';
+      h += '<div><b>' + RH.result.cnt.p + '/' + RH.result.cnt.g + '/' + RH.result.cnt.o + '/' + RH.result.cnt.m + '</b><span>' + tr('rhHitsP') + '/' + tr('rhHitsG') + '/' + tr('rhHitsO') + '/' + tr('rhHitsM') + '</span></div>';
+    }
+    h += '</div>' + (RH.result.extra ? '<div class="small" style="margin-top:4px">+' + RH.result.extra + ' ' + tr('rhExtra') + '</div>' : '') + '</div>';
+  }
+  var best = isSprint
+    ? ((S.rhythm.best.tongueN ? '🏆 ' + tr('rhAttacks') + ': ' + S.rhythm.best.tongueN : '') + (S.rhythm.best.tongueEven ? ' · ' + tr('rhEven') + ': ' + S.rhythm.best.tongueEven + '%' : ''))
+    : (S.rhythm.best[RH.ex] ? '🏆 Score: ' + S.rhythm.best[RH.ex] + '%' : '');
+  if (best) h += '<div class="small" style="text-align:center">' + best + '</div>';
+  h += '<div style="text-align:center;display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px">';
+  if (RH.phase === 'run' || RH.phase === 'count') h += '<button class="mic-btn recording" onclick="rhythmStop();render()">' + tr('stopPhrase') + '</button>';
+  else h += '<button class="mic-btn" onclick="rhStart()">' + (RH.result ? tr('tryAgain') : tr('rhStart')) + '</button>';
+  h += '</div>';
+  if (!isSprint) h += '<div class="small" style="text-align:center;margin-top:6px;color:#888">' + tr('rhMuteHint') + '</div>';
+  h += '<div class="nav-row" style="margin-top:10px"><button class="nav-btn back" onclick="goMenu()">' + backLabel() + '</button></div>';
+  app.innerHTML = h;
+}
+
+// =========================================================================
+//  DRONE / INTONATION – play intervals against a sustained tone.
+// =========================================================================
+var DR = { on: false, root: 60, target: 7, lockT0: 0, gotThis: false, base: 0.004, baseN: 0, oscs: [], gain: null };
+function goDrone() {
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop(); rhythmStop();
+  S.screen = 'drone'; render();
+}
+function drPickNote(m) {
+  var was = DR.on;
+  droneStop();
+  DR.root = m;
+  if (was) droneStart();
+  render();
+}
+function drPickTarget(t) { DR.target = t; DR.lockT0 = 0; DR.gotThis = false; render(); }
+function droneToggle() { if (DR.on) droneStop(); else droneStart(); render(); }
+function droneStart() {
+  try {
+    var ctx = ensureAudioCtx(), semi = TRANS[S.transposition].semitones;
+    var f = midiToFreq(DR.root + semi);
+    DR.gain = ctx.createGain();
+    DR.gain.gain.value = 0.055;
+    DR.gain.connect(ctx.destination);
+    [[f, 1], [f * 2, 0.35]].forEach(function(pair){
+      var o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = pair[0];
+      var g = ctx.createGain();
+      g.gain.value = pair[1];
+      o.connect(g); g.connect(DR.gain);
+      o.start();
+      DR.oscs.push(o);
+    });
+    DR.on = true;
+    DR.base = 0.004; DR.baseN = 0; DR.lockT0 = 0; DR.gotThis = false;
+    startMicListening();
+  } catch (e) {}
+}
+function droneStop() {
+  DR.oscs.forEach(function(o){ try { o.stop(); } catch (e) {} });
+  DR.oscs = [];
+  if (DR.gain) { try { DR.gain.disconnect(); } catch (e) {} DR.gain = null; }
+  DR.on = false; DR.lockT0 = 0;
+}
+function intvName(d) {
+  var names = tr('intvNames').split('|');
+  var a = ((d % 12) + 12) % 12;
+  var base = (a === 0 && d !== 0) ? tr('intvOctave') : names[a];
+  if (Math.abs(d) > 12 && a !== 0) base += ' + ' + tr('intvOctave');
+  if (d < 0) base += ' (' + tr('below') + ')';
+  return base;
+}
+function droneCloseHold(now) {
+  if (!DR.lockT0) return;
+  var held = (now - DR.lockT0) / 1000;
+  if (held > 0.4 && held > (S.drone.best || 0)) { S.drone.best = Math.round(held * 10) / 10; saveSettings(); }
+  DR.lockT0 = 0;
+}
+function droneFrame(freq) {
+  if (!DR.on) return;
+  var now = Date.now();
+  if (DR.baseN < 40) { DR.base = (DR.base * DR.baseN + S.micLevel) / (DR.baseN + 1); DR.baseN++; }
+  var lvl = document.getElementById('dr-lvl');
+  if (lvl) lvl.style.width = Math.min(100, Math.round(S.micLevelSm * 900)) + '%';
+  var iEl = document.getElementById('dr-intv'), cEl = document.getElementById('dr-cents'), hEl = document.getElementById('dr-hold');
+  var playing = S.micLevelSm > Math.max(0.013, DR.base * 3.2);
+  if (!playing || !(freq > 0)) {
+    droneCloseHold(now);
+    DR.gotThis = false;
+    if (iEl) iEl.textContent = '—';
+    if (cEl) cEl.textContent = tr('droneListen');
+    if (hEl) hEl.textContent = '\u00a0';
+    return;
+  }
+  var semi = TRANS[S.transposition].semitones;
+  var midi = midiToRounded(freq);
+  var diff = midi - (DR.root + semi);
+  var cents = centsOff(freq, midi);
+  if (iEl) iEl.textContent = intvName(diff);
+  if (cEl) cEl.textContent = (cents > 0 ? '+' : '') + cents + (S.lang === 'de' ? ' Cent' : ' cents');
+  var onT = DR.target !== null && diff === DR.target && Math.abs(cents) <= 18;
+  if (onT) {
+    if (!DR.lockT0) { DR.lockT0 = now; DR.gotThis = false; }
+    var held = (now - DR.lockT0) / 1000;
+    if (hEl) hEl.textContent = tr('droneLocking') + ' ' + held.toFixed(1) + ' s';
+    if (held > (S.drone.best || 0)) S.drone.best = Math.round(held * 10) / 10;
+    if (!DR.gotThis && held >= 3) {
+      DR.gotThis = true;
+      playFeedback(true);
+      toast('🎯 ' + tr('droneGot'));
+      ensureStats().xp = (ensureStats().xp || 0) + 12;
+      journeyEvent({ t: 'drone' });
+      checkAchievements();
+      saveSettings();
+    }
+  } else {
+    droneCloseHold(now);
+    if (hEl) hEl.textContent = '\u00a0';
+  }
+}
+function renderDrone(app) {
+  var h = '<h1>🎯 ' + tr('droneTitle') + '</h1>';
+  h += '<div class="subtitle">' + tr('droneHint') + '</div>';
+  h += '<div class="why-line">' + tr('droneWhy') + '</div>';
+  h += '<div class="small" style="width:100%;text-align:left">' + tr('droneNote') + ':</div>';
+  h += '<div class="chip-row">';
+  [60, 62, 65, 67].forEach(function(m){
+    h += '<div class="chip' + (DR.root === m ? ' selected' : '') + '" onclick="drPickNote(' + m + ')">' + writtenDisplay(m) + '</div>';
+  });
+  h += '</div>';
+  h += '<div class="small" style="width:100%;text-align:left">' + tr('droneTargetLbl') + ':</div>';
+  h += '<div class="chip-row">';
+  var names = tr('intvNames').split('|');
+  [[null, tr('droneFree')], [4, names[4]], [5, names[5]], [7, names[7]], [12, tr('intvOctave')]].forEach(function(p){
+    h += '<div class="chip' + (DR.target === p[0] ? ' selected' : '') + '" onclick="drPickTarget(' + (p[0] === null ? 'null' : p[0]) + ')">' + p[1] + '</div>';
+  });
+  h += '</div>';
+  h += '<div class="intv-big" id="dr-intv">—</div>';
+  h += '<div class="combo-status" id="dr-cents">' + (DR.on ? tr('droneListen') : '\u00a0') + '</div>';
+  h += '<div class="small" style="text-align:center;color:#22c55e;min-height:1.2em" id="dr-hold">\u00a0</div>';
+  h += '<div class="lvl-wrap"><i id="dr-lvl" style="width:0%"></i></div>';
+  h += '<div style="text-align:center;margin-top:10px">';
+  h += '<button class="mic-btn' + (DR.on ? ' recording' : '') + '" onclick="droneToggle()">' + (DR.on ? tr('droneOff') : tr('droneOn')) + '</button>';
+  h += '</div>';
+  if (S.drone.best) h += '<div class="small" style="text-align:center;margin-top:6px">🏆 ' + tr('droneBest') + ': ' + S.drone.best.toFixed(1) + ' s</div>';
+  h += '<div class="small" style="text-align:center;margin-top:6px;color:#888">' + tr('droneVolHint') + '</div>';
+  h += '<div class="nav-row" style="margin-top:10px"><button class="nav-btn back" onclick="goMenu()">' + backLabel() + '</button></div>';
+  app.innerHTML = h;
+}
+
+// =========================================================================
+//  DAILY SESSION – four steps built from your weak spots.
+// =========================================================================
+var DAILY = { active: false, step: 0, plan: [], quizGood: 0 };
+function buildDailyPlan() {
+  var plan = [];
+  var natMidi = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, H: 71 };
+  var worst = 'G', worstV = 1e9;
+  Object.keys(natMidi).forEach(function(nm){
+    var v = S.lt.best[nm] || 0;
+    if (v < worstV) { worstV = v; worst = nm; }
+  });
+  plan.push({ t: 'lt', icon: '🌬️', label: tr('dailyLt') + ' (' + writtenDisplay(natMidi[worst]) + ')', note: natMidi[worst] });
+  var fx = null;
+  for (var i = 0; i < FLEX_LESSONS.length; i++) if (!(S.jazzProgress && S.jazzProgress[FLEX_LESSONS[i].id])) { fx = FLEX_LESSONS[i]; break; }
+  if (!fx) fx = FLEX_LESSONS[Math.floor(Math.random() * FLEX_LESSONS.length)];
+  plan.push({ t: 'flex', icon: '🌀', label: tr('dailyFlex') + ': ' + fx['name_' + S.lang], id: fx.id });
+  var sg = null;
+  for (var j = 0; j < SONGS.length; j++) if (!S.songProgress[SONGS[j].id]) { sg = SONGS[j]; break; }
+  if (!sg) sg = SONGS[Math.floor(Math.random() * SONGS.length)];
+  plan.push({ t: 'song', icon: '🎵', label: tr('dailySong') + ': ' + sg['name_' + S.lang], id: sg.id });
+  plan.push({ t: 'quiz', icon: '🎺', label: tr('dailyQuiz'), n: 8 });
+  DAILY.plan = plan; DAILY.step = 0; DAILY.quizGood = 0; DAILY.active = true;
+}
+function goDaily() {
+  clearAutoAdvance(); pauseListening(); clearJazzTimers(); clearSongTimers(); stopMetronome(); ltStop(); dynStop(); droneStop(); rhythmStop();
+  S.fromJourney = null; S.fromDaily = false;
+  if (!DAILY.plan.length) buildDailyPlan();
+  S.screen = 'daily'; render();
+}
+function dailyRebuild() { buildDailyPlan(); render(); }
+function dailyAbort() { DAILY.active = false; DAILY.plan = []; S.fromDaily = false; goHome(); }
+function launchDailyStep() {
+  var st = DAILY.plan[DAILY.step];
+  if (!st) return;
+  S.fromDaily = true;
+  if (st.t === 'lt') { goLongtone(st.note); return; }
+  if (st.t === 'flex') { openFlexLesson(st.id); return; }
+  if (st.t === 'song') { openSong(st.id); return; }
+  if (st.t === 'quiz') { S.quizType = 'single'; saveSettings(); beginQuiz(); return; }
+}
+function dailyEvent(ev) {
+  if (!DAILY.active || DAILY.step >= DAILY.plan.length) return;
+  var st = DAILY.plan[DAILY.step], hit = false;
+  if (st.t === 'lt' && ev.t === 'lt' && (ev.sec || 0) >= 10) hit = true;
+  else if (st.t === 'flex' && ev.t === 'lesson') hit = true;
+  else if (st.t === 'song' && ev.t === 'song') hit = true;
+  else if (st.t === 'quiz' && ev.t === 'quiz' && ev.correct) {
+    DAILY.quizGood++;
+    var el = document.getElementById('daily-live');
+    if (el) el.textContent = DAILY.quizGood + ' / ' + st.n;
+    if (DAILY.quizGood >= st.n) hit = true;
+  }
+  if (!hit) return;
+  DAILY.step++;
+  DAILY.quizGood = 0;
+  if (DAILY.step >= DAILY.plan.length) {
+    DAILY.active = false;
+    S.dailyLog[todayKey()] = 1;
+    ensureStats().xp = (ensureStats().xp || 0) + 80;
+    toast('📅 ' + tr('dailyAllDone'));
+    celebrate();
+    journeyEvent({ t: 'daily' });
+    checkAchievements();
+    saveSettings();
+  } else {
+    toast('✓ ' + tr('stepDone') + ' – ' + tr('dailyStepLbl') + ' ' + (DAILY.step + 1) + '/4');
+    playFeedback(true);
+  }
+  if (S.screen === 'daily') render();
+}
+function renderDaily(app) {
+  var done = DAILY.plan.length && DAILY.step >= DAILY.plan.length;
+  var h = '<h1>📅 ' + tr('dailyTitle') + '</h1>';
+  h += '<div class="subtitle">' + tr('dailySub') + '</div>';
+  var pct = DAILY.plan.length ? Math.round(DAILY.step / DAILY.plan.length * 100) : 0;
+  h += '<div class="menu-section" style="padding:10px"><div class="small" style="display:flex;justify-content:space-between"><span>' + tr('dailyStepLbl') + ' ' + Math.min(DAILY.step + 1, 4) + ' / 4</span><span>' + tr('dailyMin') + '</span></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+  DAILY.plan.forEach(function(st, i){
+    var stDone = i < DAILY.step, cur = i === DAILY.step && !done;
+    var cls = 'station' + (stDone ? ' done' : (cur ? ' active' : ' lockd'));
+    h += '<div class="' + cls + '"><div class="st-icon">' + (stDone ? '✅' : st.icon) + '</div><div class="st-body">';
+    h += '<div class="st-name">' + tr('dailyStepLbl') + ' ' + (i + 1) + '</div>';
+    h += '<div class="st-desc">' + st.label + '</div>';
+    if (cur) {
+      if (st.t === 'quiz') h += '<div class="st-goal" id="daily-live">' + DAILY.quizGood + ' / ' + st.n + '</div>';
+      h += '<button class="ref-btn" style="margin-top:8px" onclick="launchDailyStep()">' + tr('dailyGo') + '</button>';
+    }
+    h += '</div></div>';
+  });
+  if (done) {
+    h += '<div class="feedback correct">' + tr('dailyAllDone') + '</div>';
+    h += '<button class="start-btn" onclick="dailyRebuild()">' + tr('dailyAgain') + '</button>';
+  }
+  h += '<div class="nav-row" style="margin-top:10px"><button class="nav-btn back" onclick="goHome()">' + tr('backMenu') + '</button>';
+  if (!done && DAILY.plan.length) h += '<button class="nav-btn" onclick="dailyAbort()">' + tr('dailyAbort') + '</button>';
+  h += '</div>';
+  app.innerHTML = h;
+}
+
+// ---- progress export / import ----
+function exportProgress() {
+  var data = {};
+  PERSIST_KEYS.forEach(function(k){ if (S[k] !== undefined) data[k] = S[k]; });
+  var payload = { app: 'trompeten-studio', v: 3, date: new Date().toISOString(), data: data };
+  try {
+    var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'trompeten-studio-fortschritt.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 500);
+    toast(tr('exportDone'));
+  } catch (e) { toast(tr('importErr')); }
+}
+function importPick() { var el = document.getElementById('imp-file'); if (el) el.click(); }
+function applyImport(txt) {
+  var obj = JSON.parse(txt);
+  var d = obj && obj.data ? obj.data : obj;
+  if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('bad');
+  PERSIST_KEYS.forEach(function(k){ if (d[k] !== undefined) S[k] = d[k]; });
+  ensureDefaults();
+  ensureStats();
+  saveSettings();
+  toast(tr('importDone'));
+  render();
+}
+function importFilePicked(inp) {
+  var f = inp.files && inp.files[0];
+  if (!f) return;
+  var r = new FileReader();
+  r.onload = function(e){
+    try { applyImport(e.target.result); }
+    catch (err) { toast(tr('importErr')); }
+  };
+  r.readAsText(f);
+  inp.value = '';
+}
+function renderBackupPanel() {
+  var h = '<div class="menu-section"><h2>💾 ' + tr('backupTitle') + '</h2>';
+  h += '<div class="small" style="margin-bottom:8px">' + tr('backupHint') + '</div>';
+  h += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
+  h += '<button class="ref-btn" onclick="exportProgress()">' + tr('exportBtn') + '</button>';
+  h += '<button class="ref-btn" onclick="importPick()">' + tr('importBtn') + '</button>';
+  h += '</div><input type="file" id="imp-file" accept="application/json,.json" style="display:none" onchange="importFilePicked(this)"></div>';
+  return h;
+}
+
 document.addEventListener('keydown', function(e){
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   if (S.screen === 'quiz') {
@@ -3841,14 +4717,7 @@ document.addEventListener('keydown', function(e){
 });
 
 loadSettings();
-// v2: make sure newly added persisted structures have all fields
-if (!S.echo || typeof S.echo.level !== 'number') S.echo = { level: 1, wins: 0, best: 0 };
-if (!S.lt || !S.lt.best) S.lt = { best: {}, bestAny: 0 };
-if (!S.dyn || !S.dyn.best) S.dyn = { best: {} };
-if (!S.journey || !S.journey.done) S.journey = { done: {}, cnt: {} };
-if (!S.journey.cnt) S.journey.cnt = {};
-if (!S.songProgress) S.songProgress = {};
-if (!S.achieved) S.achieved = {};
+ensureDefaults();
 ensureStats();
 startHeartbeat();
 render();
